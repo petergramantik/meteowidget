@@ -112,7 +112,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         val big = a.card()
         val row = a.hbox(Gravity.TOP)
         fun col(name: String, temp: Double?, hum: Int?, color: Int, gravity: Int): LinearLayout = a.vbox(gravity).apply {
-            addView(a.label(name))
+            addView(a.label(name), a.lp(WRAP, WRAP))
             addView(a.text(t(temp), 46f, color, condensed = true), a.lp(WRAP, WRAP, top = 4))
             addView(a.text(Weather.h(hum), 22f, color, condensed = true), a.lp(WRAP, WRAP, top = 2))
         }

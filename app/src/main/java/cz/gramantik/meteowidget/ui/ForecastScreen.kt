@@ -30,7 +30,10 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
     override val view: View = ScrollView(a).apply { addView(content); isFillViewport = true }
 
     private enum class Mode(val label: String) { H48("48 hodin"), D3("3 dny"), D16("16 dní") }
-    private var mode = Mode.H48
+    private var mode = Mode.D16
+    /** den, na který se má po přepnutí na 3 dny sjet */
+    private var scrollTo: LocalDate? = null
+    private val dayHeaders = HashMap<LocalDate, View>()
     private val expanded = HashSet<LocalDate>()
 
     init { refresh() }
@@ -46,6 +49,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
 
     override fun refresh() {
         content.removeAllViews()
+        dayHeaders.clear()
         val f = ForecastFull.load(a)
         if (f == null) {
             content.addView(a.text("Předpověď se načítá… Klepni na ⟳ nahoře.", 14f, C.DIM), a.lp(top = 20))
@@ -60,6 +64,20 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             Mode.D16 -> days(f)
         }
         accuracy()
+        scrollTo?.let { target ->
+            scrollTo = null
+            val header = dayHeaders[target]
+            view.post {
+                if (header == null) { (view as ScrollView).smoothScrollTo(0, 0); return@post }
+                var y = 0
+                var v: View? = header
+                while (v != null && v !== content) {
+                    y += v.top
+                    v = v.parent as? View
+                }
+                (view as ScrollView).smoothScrollTo(0, (y - a.dp(8)).coerceAtLeast(0))
+            }
+        }
         content.addView(
             a.text("Předpověď: Open-Meteo.com (CC BY 4.0) · ${Prefs(a).locName}", 11f, C.DIM),
             a.lp(top = 8)
@@ -139,13 +157,34 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                 cell.addView(a.text(if (h.storm > 0) "⚡" else " ", 12f, C.ACCENT))
                 row.addView(cell, a.lp(a.dp(70), WRAP, end = 6))
             }
-            c.addView(HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(row) })
+            val hsv = HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(row) }
+            fun arrow(t: String, dir: Int) = a.text(t, 26f, C.ACCENT, bold = true).apply {
+                gravity = Gravity.CENTER
+                setPadding(a.dp(4), a.dp(20), a.dp(4), a.dp(20))
+                setOnClickListener { hsv.smoothScrollBy(dir * a.dp(76) * 4, 0) }
+            }
+            val left = arrow("‹", -1)
+            val right = arrow("›", 1)
+            fun updateArrows() {
+                val max = (row.width - hsv.width).coerceAtLeast(0)
+                left.alpha = if (hsv.scrollX <= 0) 0.25f else 1f
+                right.alpha = if (hsv.scrollX >= max) 0.25f else 1f
+            }
+            hsv.setOnScrollChangeListener { _, _, _, _, _ -> updateArrows() }
+            hsv.post { updateArrows() }
+            val wrap = a.hbox()
+            wrap.addView(left, a.lp(WRAP, WRAP))
+            wrap.addView(hsv, a.lp(0, WRAP, 1f))
+            wrap.addView(right, a.lp(WRAP, WRAP))
+            c.addView(wrap)
         } else {
             var lastDay: LocalDate? = null
             for (h in hs) {
                 val d = h.time.toLocalDate()
                 if (d != lastDay) {
-                    c.addView(a.text(dayName(d) + " " + d.format(DateTimeFormatter.ofPattern("d.M.")), 15f, C.ACCENT, bold = true), a.lp(top = 10, bottom = 4))
+                    val header = a.text(dayName(d) + " " + d.format(DateTimeFormatter.ofPattern("d.M.")), 15f, C.ACCENT, bold = true)
+                    dayHeaders[d] = header
+                    c.addView(header, a.lp(top = 10, bottom = 4))
                     lastDay = d
                 }
                 val r = a.hbox()
@@ -180,7 +219,9 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         val c = a.card("${ds.size} dní")
         c.addView(a.text("Klepni na den pro podrobnosti", 11f, C.DIM), a.lp(bottom = 6))
         val tf = DateTimeFormatter.ofPattern("HH:mm")
-        for (d in ds) {
+        val hourDays = f.hours.map { it.time.toLocalDate() }.toSet()
+        for ((di, d) in ds.withIndex()) {
+            val jump = di < 3 && d.date in hourDays
             val box = a.vbox().apply {
                 background = rounded(C.CARD2, a.dp(12).toFloat())
                 setPadding(a.dp(10), a.dp(8), a.dp(10), a.dp(8))
@@ -202,7 +243,9 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             }, a.lp(0, WRAP, 1f, start = 8))
             r.addView(a.text(deg(d.tMax), 18f, C.IN, condensed = true), a.lp(WRAP, WRAP, end = 8))
             r.addView(a.text(deg(d.tMin), 16f, 0xFF8FB3FF.toInt(), condensed = true))
+            if (jump) r.addView(a.text("›", 24f, C.ACCENT, bold = true), a.lp(WRAP, WRAP, start = 8))
             box.addView(r)
+            if (jump) box.background = rounded(0xFF1D2630.toInt(), a.dp(12).toFloat(), a.dp(1), 0x66FFD54F)
             if (d.date in expanded) {
                 val tiles = listOf(
                     a.tile("Pocitově", "${deg(d.feelsMax)} / ${deg(d.feelsMin)}", C.FEELS),
@@ -227,8 +270,15 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                 }
             }
             box.setOnClickListener {
-                if (!expanded.add(d.date)) expanded.remove(d.date)
-                refresh()
+                if (jump) {
+                    // přepnout na 3 dny po hodinách a sjet na vybraný den
+                    mode = Mode.D3
+                    scrollTo = d.date
+                    refresh()
+                } else {
+                    if (!expanded.add(d.date)) expanded.remove(d.date)
+                    refresh()
+                }
             }
             c.addView(box, a.lp(bottom = 6))
         }

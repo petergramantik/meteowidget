@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Meteostanice</string>
+    <string name="widget_name">Meteostanice Sencor</string>
+    <string name="widget_desc">Data ze stanice Sencor SWS 16600 a předpověď na 10 dní. Roztáhni ho pro víc údajů.</string>
+    <string name="mini_widget_name">Meteostanice – jeden kanál</string>
+    <string name="mini_widget_desc">Teplota a vlhkost jednoho zvoleného čidla</string>
+</resources>

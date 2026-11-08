@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.util.SizeF
 import android.view.View
 import android.widget.RemoteViews
@@ -34,6 +35,9 @@ object WidgetRenderer {
     /** Data sdílená všemi rozloženími při jednom překreslení. */
     private class State(ctx: Context, val refreshing: Boolean) {
         val p = Prefs(ctx)
+        /** jedna bitmapa sdílená všemi rozloženími (RemoteViews ji pošle jen jednou) */
+        val graph: Bitmap by lazy { PressureHistory.render(ctx) }
+        val trend: Double? = PressureHistory.trend3h(ctx)
         val data = p.lastData
         val w = data?.let { Weather(it, p.spec) }
         val updateBadge = Updater.updateAvailable(ctx)
@@ -76,8 +80,9 @@ object WidgetRenderer {
         RemoteViews(
             mapOf(
                 SizeF(110f, 70f) to buildSmall(ctx, s),
-                SizeF(250f, 200f) to buildFull(ctx, s, withForecast = false),
-                SizeF(300f, 320f) to buildFull(ctx, s, withForecast = true),
+                SizeF(250f, 200f) to buildFull(ctx, s, withForecast = false, withGraph = false),
+                SizeF(300f, 320f) to buildFull(ctx, s, withForecast = true, withGraph = false),
+                SizeF(300f, 410f) to buildFull(ctx, s, withForecast = true, withGraph = true),
             )
         )
 
@@ -104,7 +109,7 @@ object WidgetRenderer {
         return v
     }
 
-    private fun buildFull(ctx: Context, s: State, withForecast: Boolean): RemoteViews {
+    private fun buildFull(ctx: Context, s: State, withForecast: Boolean, withGraph: Boolean): RemoteViews {
         val v = RemoteViews(ctx.packageName, R.layout.widget_full)
         header(ctx, v, s)
         v.setOnClickPendingIntent(R.id.settings, settingsIntent(ctx))
@@ -131,7 +136,24 @@ object WidgetRenderer {
         v.setTextViewText(R.id.feels, Weather.t(w?.feelsLike))
         v.setTextViewText(R.id.uv, num(w?.uv))
         v.setTextViewText(R.id.light, num(w?.lightKlux))
-        v.setTextViewText(R.id.pressure, w?.pressure?.let { String.format(CZ, "%.0f", it) } ?: "--")
+        val arrow = when {
+            s.trend == null -> ""
+            s.trend >= 1.0 -> " ↗"
+            s.trend <= -1.0 -> " ↘"
+            else -> " →"
+        }
+        v.setTextViewText(R.id.pressure, w?.pressure?.let { String.format(CZ, "%.0f", it) + arrow } ?: "--")
+
+        if (withGraph) {
+            v.setViewVisibility(R.id.graph_section, View.VISIBLE)
+            v.setImageViewBitmap(R.id.pressure_graph, s.graph)
+            v.setTextViewText(
+                R.id.graph_title,
+                "TLAK 24 H" + (s.trend?.let { " · ZA 3 H " + String.format(CZ, "%+.1f hPa", it) } ?: "")
+            )
+        } else {
+            v.setViewVisibility(R.id.graph_section, View.GONE)
+        }
 
         v.setTextViewText(R.id.rain, w?.rainDay?.let { "${Weather.n1(it)} mm" } ?: "--")
         val rate = w?.rainRate?.takeIf { it > 0 }

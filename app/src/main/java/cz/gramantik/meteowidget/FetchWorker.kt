@@ -22,11 +22,16 @@ object Sync {
     fun run(ctx: Context, forceForecast: Boolean = false) {
         val p = Prefs(ctx)
         if (p.isConfigured) {
+            val client = TuyaClient(p)
             try {
-                p.saveData(TuyaClient(p).fetchStatus(), System.currentTimeMillis())
+                val data = client.fetchStatus()
+                val t = System.currentTimeMillis()
+                p.saveData(data, t)
+                Weather(data, p.spec).pressure?.let { PressureHistory.add(ctx, listOf(t to it)) }
             } catch (e: Exception) {
                 p.lastError = e.message ?: e.javaClass.simpleName
             }
+            backfillPressure(ctx, p, client)
         }
         val now = System.currentTimeMillis()
         if (forceForecast || now - p.forecastTime > FORECAST_EVERY || p.forecastFrom != p.forecastSource) {
@@ -44,6 +49,24 @@ object Sync {
             }
         }
         WidgetRenderer.updateAll(ctx)
+    }
+
+    /** Dotáhne historii tlaku z Tuya cloudu, pokud je místní krátká (nejvýš 1× za 6 h). */
+    private fun backfillPressure(ctx: Context, p: Prefs, client: TuyaClient) {
+        val sp = ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (!PressureHistory.needsBackfill(ctx)) return
+        if (now - sp.getLong("pBackfill", 0) < 6 * 60 * 60_000L) return
+        sp.edit().putLong("pBackfill", now).apply()
+        try {
+            val code = "atmospheric_pressture"
+            val scale = p.spec[code]?.scale ?: 1
+            val div = Math.pow(10.0, scale.toDouble())
+            val logs = client.fetchReportLogs(code, now - 25 * 60 * 60_000L, now)
+            PressureHistory.add(ctx, logs.map { it.first to it.second / div })
+        } catch (e: Exception) {
+            // historie v cloudu nemusí být dostupná – graf se naplní postupně sám
+        }
     }
 }
 

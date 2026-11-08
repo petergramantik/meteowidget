@@ -4,11 +4,11 @@
     android:initialLayout="@layout/widget_full"
     android:previewLayout="@layout/widget_full"
     android:minWidth="300dp"
-    android:minHeight="320dp"
+    android:minHeight="410dp"
     android:minResizeWidth="110dp"
     android:minResizeHeight="70dp"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="5"
-    android:targetCellHeight="4"
+    android:targetCellHeight="5"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

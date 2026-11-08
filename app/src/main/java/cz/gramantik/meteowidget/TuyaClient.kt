@@ -60,6 +60,39 @@ class TuyaClient(private val prefs: Prefs) {
         return map
     }
 
+    /**
+     * Historie hlášení jedné hodnoty z Tuya cloudu (event_time v ms, surová hodnota).
+     * Parametry dotazu musí být seřazené podle abecedy kvůli podpisu.
+     */
+    fun fetchReportLogs(code: String, from: Long, to: Long, maxPages: Int = 15): List<Pair<Long, Double>> {
+        val out = ArrayList<Pair<Long, Double>>()
+        var rowKey: String? = null
+        repeat(maxPages) {
+            val q = sortedMapOf(
+                "codes" to code,
+                "end_time" to to.toString(),
+                "size" to "100",
+                "start_time" to from.toString(),
+            )
+            rowKey?.let { q["last_row_key"] = it }
+            val path = "/v2.0/cloud/thing/${prefs.deviceId}/report-logs?" +
+                q.entries.joinToString("&") { "${it.key}=${it.value}" }
+            val json = request(path, getToken())
+            val r = json.optJSONObject("result") ?: return out
+            val logs = r.optJSONArray("logs")
+            if (logs != null) {
+                for (i in 0 until logs.length()) {
+                    val o = logs.getJSONObject(i)
+                    val v = o.optString("value").toDoubleOrNull() ?: continue
+                    out.add(o.optLong("event_time") to v)
+                }
+            }
+            if (!r.optBoolean("has_more")) return out
+            rowKey = r.optString("last_row_key").ifEmpty { return out }
+        }
+        return out
+    }
+
     private fun readStatus(): Map<String, Any> {
         val token = getToken()
         val json = request("/v1.0/devices/${prefs.deviceId}/status", token)

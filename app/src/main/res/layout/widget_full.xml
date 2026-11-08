@@ -11,7 +11,7 @@
     android:paddingEnd="12dp"
     android:paddingBottom="10dp">
 
-    <!-- ===== řádek 1: VENKU | VÍTR | DOMA ===== -->
+    <!-- ===== řádek 1: DOMA | VÍTR | VENKU ===== -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,21 +19,20 @@
 
         <LinearLayout style="@style/LcdCell">
             <TextView
-                android:id="@+id/label_out"
+                android:id="@+id/label_in"
                 style="@style/LcdLabel"
-                android:text="VENKU" />
+                android:text="DOMA" />
             <TextView
-                android:id="@+id/temp_out"
+                android:id="@+id/temp_in"
                 style="@style/LcdBig"
                 android:text="--°"
-                android:textColor="@color/lcd_out" />
+                android:textColor="@color/lcd_in" />
             <TextView
-                android:id="@+id/hum_out"
+                android:id="@+id/hum_in"
                 style="@style/LcdValue"
-                android:textColor="@color/lcd_out"
+                android:textColor="@color/lcd_in"
                 android:textSize="24sp" />
         </LinearLayout>
-
         <TextView style="@style/LcdVLine" />
 
         <LinearLayout
@@ -69,20 +68,21 @@
             style="@style/LcdCell"
             android:gravity="end">
             <TextView
-                android:id="@+id/label_in"
+                android:id="@+id/label_out"
                 style="@style/LcdLabel"
-                android:text="DOMA" />
+                android:text="VENKU" />
             <TextView
-                android:id="@+id/temp_in"
+                android:id="@+id/temp_out"
                 style="@style/LcdBig"
                 android:text="--°"
-                android:textColor="@color/lcd_in" />
+                android:textColor="@color/lcd_out" />
             <TextView
-                android:id="@+id/hum_in"
+                android:id="@+id/hum_out"
                 style="@style/LcdValue"
-                android:textColor="@color/lcd_in"
+                android:textColor="@color/lcd_out"
                 android:textSize="24sp" />
         </LinearLayout>
+
     </LinearLayout>
 
     <TextView
@@ -187,6 +187,33 @@
                 android:textColor="@color/lcd_sensor"
                 android:textSize="15sp" />
         </LinearLayout>
+    </LinearLayout>
+
+    <!-- ===== vývoj tlaku za 24 h (jako HISTORY BARO na stanici) ===== -->
+    <LinearLayout
+        android:id="@+id/graph_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView style="@style/LcdHLine" />
+
+        <TextView
+            android:id="@+id/graph_title"
+            style="@style/LcdLabel"
+            android:layout_width="match_parent"
+            android:layout_marginTop="5dp"
+            android:ellipsize="end"
+            android:text="TLAK 24 H"
+            android:textColor="@color/lcd_baro" />
+
+        <ImageView
+            android:id="@+id/pressure_graph"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="2dp"
+            android:scaleType="fitXY" />
     </LinearLayout>
 
     <!-- ===== předpověď (jako HISTORY na stanici) ===== -->

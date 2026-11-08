@@ -13,7 +13,7 @@
         android:id="@+id/mini_temp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:fontFamily="sans-serif-light"
+        android:fontFamily="sans-serif-condensed"
         android:includeFontPadding="false"
         android:maxLines="1"
         android:text="--°"
@@ -33,7 +33,8 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#B3FFFFFF"
+            android:textColor="@color/lcd_label"
+            android:textStyle="bold"
             android:textSize="11sp" />
 
         <TextView

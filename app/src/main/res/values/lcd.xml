@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- barvy podle displeje stanice -->
+    <color name="lcd_out">#FF3DDC97</color>
+    <color name="lcd_in">#FFF5B88A</color>
+    <color name="lcd_wind">#FFCFE3FF</color>
+    <color name="lcd_dir">#FFFF6B6B</color>
+    <color name="lcd_feels">#FFB8C8FF</color>
+    <color name="lcd_uv">#FFDCCBF2</color>
+    <color name="lcd_light">#FFB8F0C8</color>
+    <color name="lcd_baro">#FFD4F05A</color>
+    <color name="lcd_rain">#FF2E9BFF</color>
+    <color name="lcd_sensor">#FF5FD3C8</color>
+    <color name="lcd_label">#FFFFFFFF</color>
+    <color name="lcd_dim">#99FFFFFF</color>
+    <color name="lcd_line">#55FFFFFF</color>
+
+    <!-- popisek panelu (OUT, IN, WIND…) -->
+    <style name="LcdLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/lcd_label</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <!-- hodnota v menším panelu -->
+    <style name="LcdValue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:maxLines">1</item>
+    </style>
+
+    <!-- velká hodnota (teploty) -->
+    <style name="LcdBig" parent="LcdValue">
+        <item name="android:textSize">40sp</item>
+    </style>
+
+    <!-- buňka panelu -->
+    <style name="LcdCell">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingTop">4dp</item>
+        <item name="android:paddingBottom">4dp</item>
+    </style>
+
+    <style name="LcdHLine">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">@color/lcd_line</item>
+    </style>
+
+    <style name="LcdVLine">
+        <item name="android:layout_width">1dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_marginStart">8dp</item>
+        <item name="android:layout_marginEnd">8dp</item>
+        <item name="android:background">@color/lcd_line</item>
+    </style>
+</resources>

@@ -22,7 +22,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:maxLines="1"
-            android:textColor="#B3FFFFFF"
+            android:textColor="@color/lcd_label"
+            android:textStyle="bold"
             android:textSize="12sp" />
 
         <TextView
@@ -43,10 +44,10 @@
             android:id="@+id/temp_out"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-light"
+            android:fontFamily="sans-serif-condensed"
             android:includeFontPadding="false"
             android:text="--°"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/lcd_out"
             android:textSize="34sp" />
 
         <TextView
@@ -54,7 +55,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:textColor="#CCFFFFFF"
+            android:textColor="@color/lcd_out"
             android:textSize="15sp" />
     </LinearLayout>
 
@@ -63,6 +64,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:maxLines="2"
-        android:textColor="#FFFFFFFF"
+        android:textColor="@color/lcd_in"
         android:textSize="13sp" />
 </LinearLayout>

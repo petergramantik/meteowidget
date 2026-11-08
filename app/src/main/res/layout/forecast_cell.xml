@@ -27,6 +27,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
         android:maxLines="1"
+        android:fontFamily="sans-serif-condensed"
         android:textColor="#FFFFFFFF"
         android:textSize="13sp"
         android:textStyle="bold" />
@@ -36,7 +37,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:maxLines="1"
-        android:textColor="#B3FFFFFF"
+        android:textColor="@color/lcd_feels"
         android:textSize="12sp" />
 
     <TextView
@@ -44,6 +45,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:maxLines="1"
-        android:textColor="#FF8FD3FF"
+        android:textColor="@color/lcd_rain"
         android:textSize="10sp" />
 </LinearLayout>

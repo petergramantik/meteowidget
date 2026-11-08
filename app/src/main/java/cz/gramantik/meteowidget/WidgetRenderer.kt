@@ -76,14 +76,14 @@ object WidgetRenderer {
         RemoteViews(
             mapOf(
                 SizeF(110f, 70f) to buildSmall(ctx, s),
-                SizeF(250f, 150f) to buildFull(ctx, s, withForecast = false),
-                SizeF(300f, 270f) to buildFull(ctx, s, withForecast = true),
+                SizeF(250f, 200f) to buildFull(ctx, s, withForecast = false),
+                SizeF(300f, 320f) to buildFull(ctx, s, withForecast = true),
             )
         )
 
     private fun header(ctx: Context, v: RemoteViews, s: State) {
         v.setOnClickPendingIntent(R.id.root, refreshIntent(ctx))
-        v.setTextViewText(R.id.label_out, s.p.channelName(Channel.OUT))
+        v.setTextViewText(R.id.label_out, s.p.channelName(Channel.OUT).uppercase(CZ))
         v.setTextViewText(R.id.updated, s.timeText)
     }
 
@@ -104,11 +104,6 @@ object WidgetRenderer {
         return v
     }
 
-    private fun setLine(v: RemoteViews, id: Int, parts: List<String>, sep: String = " · ") {
-        v.setViewVisibility(id, if (parts.isEmpty()) View.GONE else View.VISIBLE)
-        v.setTextViewText(id, parts.joinToString(sep))
-    }
-
     private fun buildFull(ctx: Context, s: State, withForecast: Boolean): RemoteViews {
         val v = RemoteViews(ctx.packageName, R.layout.widget_full)
         header(ctx, v, s)
@@ -118,40 +113,46 @@ object WidgetRenderer {
 
         val p = s.p
         val w = s.w
-        if (w == null) {
-            v.setTextViewText(R.id.temp_out, "--°")
-            v.setTextViewText(R.id.hum_out, "")
-            v.setTextViewText(R.id.line_in, s.placeholder ?: "")
-            for (id in listOf(R.id.line_sensors, R.id.line_wind, R.id.line_rain, R.id.line_extra)) {
-                v.setViewVisibility(id, View.GONE)
-            }
-        } else {
-            v.setTextViewText(R.id.temp_out, Weather.t(w.tempOut))
-            v.setTextViewText(R.id.hum_out, Weather.h(w.humOut))
-            v.setTextViewText(R.id.line_in, "${p.channelName(Channel.IN)}  ${Weather.t(w.tempIn)} · ${Weather.h(w.humIn)}")
+        v.setTextViewText(R.id.label_out, p.channelName(Channel.OUT).uppercase(CZ))
+        v.setTextViewText(R.id.label_in, p.channelName(Channel.IN).uppercase(CZ))
+        fun num(x: Double?) = x?.let { Weather.n1(it) } ?: "--"
 
+        v.setTextViewText(R.id.temp_out, Weather.t(w?.tempOut))
+        v.setTextViewText(R.id.hum_out, Weather.h(w?.humOut))
+        v.setTextViewText(R.id.temp_in, Weather.t(w?.tempIn))
+        v.setTextViewText(R.id.hum_in, Weather.h(w?.humIn))
+
+        v.setTextViewText(R.id.wind_speed, num(w?.windAvg))
+        v.setTextViewText(R.id.wind_info, w?.windGust?.let { "km/h · nárazy ${Weather.n1(it)}" } ?: "km/h")
+        val dir = w?.windDir
+        v.setViewVisibility(R.id.wind_dir, if (dir == null) View.GONE else View.VISIBLE)
+        v.setTextViewText(R.id.wind_dir, dir ?: "")
+
+        v.setTextViewText(R.id.feels, Weather.t(w?.feelsLike))
+        v.setTextViewText(R.id.uv, num(w?.uv))
+        v.setTextViewText(R.id.light, num(w?.lightKlux))
+        v.setTextViewText(R.id.pressure, w?.pressure?.let { String.format(CZ, "%.0f", it) } ?: "--")
+
+        v.setTextViewText(R.id.rain, w?.rainDay?.let { "${Weather.n1(it)} mm" } ?: "--")
+        val rate = w?.rainRate?.takeIf { it > 0 }
+        v.setViewVisibility(R.id.rain_rate, if (rate == null) View.GONE else View.VISIBLE)
+        v.setTextViewText(R.id.rain_rate, rate?.let { "${Weather.n1(it)} mm/h" } ?: "")
+        v.setTextViewText(R.id.dew, Weather.t(w?.dewPoint))
+
+        // čidla 1–3, nebo hláška, když data ještě nejsou
+        if (w == null) {
+            v.setViewVisibility(R.id.sensors_cell, View.VISIBLE)
+            v.setTextViewText(R.id.sensors_label, "")
+            v.setTextViewText(R.id.sensors, s.placeholder ?: "")
+            if (!p.isConfigured) v.setOnClickPendingIntent(R.id.root, settingsIntent(ctx))
+        } else {
             val sensors = listOf(Channel.S1, Channel.S2, Channel.S3).mapNotNull { ch ->
                 val t = w.temp(ch.tempCode) ?: return@mapNotNull null
                 "${p.channelName(ch)}  ${Weather.t(t)} · ${Weather.h(w.hum(ch.humCode))}"
             }
-            setLine(v, R.id.line_sensors, sensors, "\n")
-
-            setLine(v, R.id.line_wind, buildList {
-                w.windAvg?.let { add("💨 ${Weather.n1(it)} km/h") }
-                w.windGust?.let { add("nárazy ${Weather.n1(it)}") }
-                w.windDir?.let { add(it) }
-            })
-            setLine(v, R.id.line_rain, buildList {
-                w.rainDay?.let { add("🌧 ${Weather.n1(it)} mm") }
-                w.rainRate?.takeIf { it > 0 }?.let { add("${Weather.n1(it)} mm/h") }
-                w.uv?.let { add("UV ${Weather.n1(it)}") }
-                w.lightKlux?.let { add("☀ ${Weather.n1(it)} klux") }
-            })
-            setLine(v, R.id.line_extra, buildList {
-                w.pressure?.let { add(Weather.hpa(it)) }
-                w.feelsLike?.let { add("pocitově ${Weather.t(it)}") }
-                w.dewPoint?.let { add("rosný bod ${Weather.t(it)}") }
-            })
+            v.setViewVisibility(R.id.sensors_cell, if (sensors.isEmpty()) View.GONE else View.VISIBLE)
+            v.setTextViewText(R.id.sensors_label, "ČIDLA")
+            v.setTextViewText(R.id.sensors, sensors.joinToString("\n"))
         }
 
         if (!withForecast) {
@@ -164,9 +165,9 @@ object WidgetRenderer {
         v.setTextViewText(
             R.id.forecast_title,
             when {
-                days.isEmpty() && p.forecastError != null -> "Předpověď: ⚠ ${p.forecastError}"
-                days.isEmpty() -> "Předpověď se načítá…"
-                else -> "Předpověď · ${p.locName} · $src"
+                days.isEmpty() && p.forecastError != null -> "PŘEDPOVĚĎ  ⚠ ${p.forecastError}"
+                days.isEmpty() -> "PŘEDPOVĚĎ SE NAČÍTÁ…"
+                else -> "PŘEDPOVĚĎ 10 DNÍ · ${p.locName.uppercase(CZ)} · $src"
             }
         )
         v.removeAllViews(R.id.forecast_row)
@@ -211,7 +212,16 @@ object WidgetRenderer {
         val v = RemoteViews(ctx.packageName, R.layout.widget_mini)
         v.setOnClickPendingIntent(R.id.root, refreshIntent(ctx))
         val ch = s.p.miniChannel(widgetId)
-        v.setTextViewText(R.id.mini_name, if (s.refreshing) "obnovuji…" else s.p.channelName(ch))
+        v.setTextViewText(R.id.mini_name, if (s.refreshing) "obnovuji…" else s.p.channelName(ch).uppercase(CZ))
+        val color = ctx.getColor(
+            when (ch) {
+                Channel.OUT -> R.color.lcd_out
+                Channel.IN -> R.color.lcd_in
+                else -> R.color.lcd_sensor
+            }
+        )
+        v.setTextColor(R.id.mini_temp, color)
+        v.setTextColor(R.id.mini_hum, color)
         val w = s.w
         v.setTextViewText(R.id.mini_temp, Weather.t(w?.temp(ch.tempCode)))
         v.setTextViewText(R.id.mini_hum, Weather.h(w?.hum(ch.humCode)))

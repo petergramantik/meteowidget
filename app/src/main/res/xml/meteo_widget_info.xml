@@ -4,7 +4,7 @@
     android:initialLayout="@layout/widget_full"
     android:previewLayout="@layout/widget_full"
     android:minWidth="300dp"
-    android:minHeight="280dp"
+    android:minHeight="320dp"
     android:minResizeWidth="110dp"
     android:minResizeHeight="70dp"
     android:resizeMode="horizontal|vertical"

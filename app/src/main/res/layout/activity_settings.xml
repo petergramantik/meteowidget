@@ -105,6 +105,26 @@
             </LinearLayout>
         </LinearLayout>
 
+        <TextView style="@style/Section" android:text="Upozornění" />
+
+        <CheckBox android:id="@+id/n_frost" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mráz – teplota venku pod (°C):" />
+        <EditText android:id="@+id/n_frost_lim" style="@style/Field" android:inputType="numberDecimal|numberSigned" />
+
+        <CheckBox android:id="@+id/n_rain" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Začátek deště (podle stanice)" />
+
+        <CheckBox android:id="@+id/n_wind" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Silný vítr – nárazy od (km/h):" />
+        <EditText android:id="@+id/n_wind_lim" style="@style/Field" android:inputType="numberDecimal" />
+
+        <CheckBox android:id="@+id/n_pres" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Rychlý pokles tlaku – za 3 h o (hPa):" />
+        <EditText android:id="@+id/n_pres_lim" style="@style/Field" android:inputType="numberDecimal" />
+
+        <CheckBox android:id="@+id/n_uv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Vysoké UV – index od:" />
+        <EditText android:id="@+id/n_uv_lim" style="@style/Field" android:inputType="numberDecimal" />
+
+        <CheckBox android:id="@+id/n_alerts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Výstrahy ČHMÚ" />
+        <TextView style="@style/Label" android:text="Oblast výstrah (název ORP nebo okresu, např. Kyjov)" />
+        <EditText android:id="@+id/alert_region" style="@style/Field" android:inputType="text" />
+
         <TextView style="@style/Section" android:text="Televize – jas a noční režim" />
 
         <TextView

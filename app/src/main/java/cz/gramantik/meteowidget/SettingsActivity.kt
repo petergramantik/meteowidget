@@ -20,6 +20,7 @@ class SettingsActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var updateStatus: TextView
     private lateinit var updateButton: Button
+    private val numFields = ArrayList<Pair<EditText, (Float) -> Unit>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,6 +88,34 @@ class SettingsActivity : Activity() {
         lat.setText(prefs.lat.toString())
         lon.setText(prefs.lon.toString())
 
+        // ---------- upozornění ----------
+        val np = NotifyPrefs(this)
+        fun bindCheck(id: Int, get: Boolean, set: (Boolean) -> Unit) {
+            val cb = findViewById<CheckBox>(id)
+            cb.isChecked = get
+            cb.setOnCheckedChangeListener { _, v -> set(v) }
+        }
+        fun bindNum(id: Int, get: Float, set: (Float) -> Unit) {
+            val e = findViewById<EditText>(id)
+            e.setText(if (get % 1f == 0f) get.toInt().toString() else get.toString())
+            e.setOnFocusChangeListener { _, has ->
+                if (!has) e.text.toString().replace(',', '.').toFloatOrNull()?.let(set)
+            }
+            numFields.add(e to set)
+        }
+        bindCheck(R.id.n_frost, np.frost) { np.frost = it }
+        bindNum(R.id.n_frost_lim, np.frostLimit) { np.frostLimit = it }
+        bindCheck(R.id.n_rain, np.rain) { np.rain = it }
+        bindCheck(R.id.n_wind, np.wind) { np.wind = it }
+        bindNum(R.id.n_wind_lim, np.windLimit) { np.windLimit = it }
+        bindCheck(R.id.n_pres, np.pressure) { np.pressure = it }
+        bindNum(R.id.n_pres_lim, np.pressureLimit) { np.pressureLimit = it }
+        bindCheck(R.id.n_uv, np.uv) { np.uv = it }
+        bindNum(R.id.n_uv_lim, np.uvLimit) { np.uvLimit = it }
+        bindCheck(R.id.n_alerts, np.alerts) { np.alerts = it }
+        val region = findViewById<EditText>(R.id.alert_region)
+        region.setText(Alerts.region(this))
+
         // ---------- televize ----------
         val tv = TvPrefs(this)
         val dayLabel = findViewById<TextView>(R.id.tv_day_label)
@@ -148,6 +177,8 @@ class SettingsActivity : Activity() {
             prefs.locName = locName.text.toString().ifBlank { "Těmice" }
             lat.text.toString().replace(',', '.').toDoubleOrNull()?.let { prefs.lat = it }
             lon.text.toString().replace(',', '.').toDoubleOrNull()?.let { prefs.lon = it }
+            numFields.forEach { (e, set) -> e.text.toString().replace(',', '.').toFloatOrNull()?.let(set) }
+            Alerts.setRegion(this, region.text.toString())
             nightFrom.text.toString().toIntOrNull()?.let { tv.nightFrom = it }
             nightTo.text.toString().toIntOrNull()?.let { tv.nightTo = it }
             if (credentialsChanged) prefs.clearToken()

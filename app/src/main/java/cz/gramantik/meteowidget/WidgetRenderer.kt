@@ -67,6 +67,15 @@ object WidgetRenderer {
         )
     }
 
+    /** Klepnutí na widget otevře aplikaci. */
+    private fun appIntent(ctx: Context): PendingIntent {
+        val i = Intent(ctx, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return PendingIntent.getActivity(
+            ctx, 2, i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+    }
+
     private fun settingsIntent(ctx: Context): PendingIntent {
         val i = Intent(ctx, SettingsActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -87,7 +96,7 @@ object WidgetRenderer {
         )
 
     private fun header(ctx: Context, v: RemoteViews, s: State) {
-        v.setOnClickPendingIntent(R.id.root, refreshIntent(ctx))
+        v.setOnClickPendingIntent(R.id.root, appIntent(ctx))
         v.setTextViewText(R.id.label_out, s.p.channelName(Channel.OUT).uppercase(CZ))
         v.setTextViewText(R.id.updated, s.timeText)
     }
@@ -257,7 +266,7 @@ object WidgetRenderer {
     // ---------- mini widget ----------
     private fun buildMini(ctx: Context, s: State, widgetId: Int): RemoteViews {
         val v = RemoteViews(ctx.packageName, R.layout.widget_mini)
-        v.setOnClickPendingIntent(R.id.root, refreshIntent(ctx))
+        v.setOnClickPendingIntent(R.id.root, appIntent(ctx))
         val ch = s.p.miniChannel(widgetId)
         v.setTextViewText(R.id.mini_name, if (s.refreshing) "obnovuji…" else s.p.channelName(ch).uppercase(CZ))
         val color = ctx.getColor(

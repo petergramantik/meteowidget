@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- stejné APK běží na telefonu i na Android TV -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -40,16 +41,24 @@
             </intent-filter>
         </service>
 
+        <!-- hlavní aplikace v telefonu -->
         <activity
-            android:name=".SettingsActivity"
+            android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
-            android:windowSoftInputMode="adjustResize">
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Material.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="Nastavení"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ChannelConfigActivity"

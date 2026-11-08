@@ -1,7 +1,5 @@
 package cz.gramantik.meteowidget
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -21,24 +19,54 @@ object Sync {
 
     fun run(ctx: Context, forceForecast: Boolean = false) {
         val p = Prefs(ctx)
+        val db = MeteoDb.get(ctx)
         if (p.isConfigured) {
             val client = TuyaClient(p)
             try {
                 val data = client.fetchStatus()
                 val t = System.currentTimeMillis()
                 p.saveData(data, t)
-                Weather(data, p.spec).pressure?.let { PressureHistory.add(ctx, listOf(t to it)) }
+                val w = Weather(data, p.spec)
+                w.pressure?.let { PressureHistory.add(ctx, listOf(t to it)) }
+                val prev = db.last()
+                // do historie nejvýš 1 záznam za 5 minut
+                if (prev == null || t - prev.t > 5 * 60_000L) db.insert(Sample.from(t, w))
+                try {
+                    Notify.checkStation(ctx, w, prev)
+                } catch (e: Exception) {
+                    // upozornění nesmí shodit stahování
+                }
             } catch (e: Exception) {
                 p.lastError = e.message ?: e.javaClass.simpleName
             }
             backfillPressure(ctx, p, client)
+            try {
+                HistoryBackfill.runIfNeeded(ctx, p, client)
+            } catch (e: Exception) {
+                // zkusí se později
+            }
         }
         val now = System.currentTimeMillis()
         if (forceForecast || now - p.forecastTime > FORECAST_EVERY || p.forecastFrom != p.forecastSource) {
             try {
                 p.forecast = ForecastClient.fetch(p)
+                if (p.forecastSource == Prefs.SOURCE_GOOGLE) ForecastFull.logTomorrow(ctx, p.forecast, "google")
             } catch (e: Exception) {
                 p.forecastError = e.message ?: e.javaClass.simpleName
+            }
+        }
+        if (forceForecast || now - ForecastFull.fetchedAt(ctx) > FORECAST_EVERY) {
+            try {
+                ForecastFull.fetch(ctx)
+            } catch (e: Exception) {
+                // podrobná předpověď je jen pro aplikaci
+            }
+        }
+        if (forceForecast || now - Alerts.fetchedAt(ctx) > 30 * 60_000L) {
+            try {
+                Alerts.fetch(ctx)
+            } catch (e: Exception) {
+                // výstrahy nejsou kritické
             }
         }
         if (now - p.updateCheckTime > UPDATE_EVERY) {
@@ -102,15 +130,8 @@ class FetchWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
                 .enqueueUniqueWork(ONCE, ExistingWorkPolicy.REPLACE, req)
         }
 
-        /** Zruší pravidelnou obnovu, jen pokud na ploše nezůstal žádný widget. */
-        fun cancelIfNoWidgets(ctx: Context) {
-            val mgr = AppWidgetManager.getInstance(ctx)
-            val any = listOf(MeteoWidgetProvider::class.java, MiniWidgetProvider::class.java)
-                .any { mgr.getAppWidgetIds(ComponentName(ctx, it)).isNotEmpty() }
-            if (!any) {
-                WorkManager.getInstance(ctx).cancelUniqueWork(PERIODIC)
-                WorkManager.getInstance(ctx).cancelUniqueWork(ONCE)
-            }
-        }
+        /** Sběr historie běží i bez widgetů, proto se plán už nikdy neruší. */
+        @Suppress("UNUSED_PARAMETER")
+        fun cancelIfNoWidgets(ctx: Context) = Unit
     }
 }

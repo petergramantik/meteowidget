@@ -105,6 +105,72 @@
             </LinearLayout>
         </LinearLayout>
 
+        <TextView style="@style/Section" android:text="Televize – jas a noční režim" />
+
+        <TextView
+            android:id="@+id/tv_day_label"
+            style="@style/Label"
+            android:text="Jas ve dne" />
+        <SeekBar
+            android:id="@+id/tv_day"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100" />
+
+        <CheckBox
+            android:id="@+id/tv_night_on"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Noční režim" />
+
+        <TextView
+            android:id="@+id/tv_night_label"
+            style="@style/Label"
+            android:text="Jas v noci" />
+        <SeekBar
+            android:id="@+id/tv_night"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView style="@style/Label" android:text="Noc od (hodina)" />
+                <EditText
+                    android:id="@+id/tv_night_from"
+                    style="@style/Field"
+                    android:inputType="number"
+                    android:maxLength="2" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView style="@style/Label" android:text="Noc do (hodina)" />
+                <EditText
+                    android:id="@+id/tv_night_to"
+                    style="@style/Field"
+                    android:inputType="number"
+                    android:maxLength="2" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            style="@style/Label"
+            android:text="Na panelu v televizi mění jas i šipky nahoru/dolů. OK = nastavení, šipka doprava = obnovit." />
+
         <Button
             android:id="@+id/save"
             android:layout_width="match_parent"

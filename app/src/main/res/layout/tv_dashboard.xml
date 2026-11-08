@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Panel pro televizi. Navrženo na plátno 640×360 dp, aplikace ho zvětší na celou obrazovku. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="640dp"
+    android:layout_height="360dp"
+    android:background="#FF000000"
+    android:orientation="vertical"
+    android:paddingStart="18dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="18dp"
+    android:paddingBottom="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <!-- stanice -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.3"
+            android:orientation="vertical">
+            <!-- ===== řádek 1: DOMA | VÍTR | VENKU ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/LcdCell">
+                    <TextView
+                        android:id="@+id/label_in"
+                        style="@style/LcdLabel"
+                        android:text="DOMA" />
+                    <TextView
+                        android:id="@+id/temp_in"
+                        style="@style/LcdBig"
+                        android:text="--°"
+                        android:textColor="@color/lcd_in" />
+                    <TextView
+                        android:id="@+id/hum_in"
+                        style="@style/LcdValue"
+                        android:textColor="@color/lcd_in"
+                        android:textSize="24sp" />
+                </LinearLayout>
+                <TextView style="@style/LcdVLine" />
+
+                <LinearLayout
+                    style="@style/LcdCell"
+                    android:gravity="center_horizontal">
+                    <TextView
+                        style="@style/LcdLabel"
+                        android:text="VÍTR" />
+                    <TextView
+                        android:id="@+id/wind_speed"
+                        style="@style/LcdValue"
+                        android:text="--"
+                        android:textColor="@color/lcd_wind"
+                        android:textSize="30sp" />
+                    <TextView
+                        android:id="@+id/wind_info"
+                        style="@style/LcdLabel"
+                        android:textColor="@color/lcd_dim"
+                        android:textStyle="normal"
+                        android:text="km/h" />
+                    <TextView
+                        android:id="@+id/wind_dir"
+                        style="@style/LcdValue"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/lcd_dir"
+                        android:textSize="20sp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <TextView style="@style/LcdVLine" />
+
+                <LinearLayout
+                    style="@style/LcdCell"
+                    android:gravity="end">
+                    <TextView
+                        android:id="@+id/label_out"
+                        style="@style/LcdLabel"
+                        android:text="VENKU" />
+                    <TextView
+                        android:id="@+id/temp_out"
+                        style="@style/LcdBig"
+                        android:text="--°"
+                        android:textColor="@color/lcd_out" />
+                    <TextView
+                        android:id="@+id/hum_out"
+                        style="@style/LcdValue"
+                        android:textColor="@color/lcd_out"
+                        android:textSize="24sp" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <TextView
+                style="@style/LcdHLine"
+                android:layout_marginTop="6dp" />
+
+            <!-- ===== řádek 2: POCITOVĚ | UV | SVĚTLO | TLAK ===== -->
+            <LinearLayout
+                android:id="@+id/row2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/LcdCell">
+                    <TextView style="@style/LcdLabel" android:text="POCITOVĚ" />
+                    <TextView
+                        android:id="@+id/feels"
+                        style="@style/LcdValue"
+                        android:text="--"
+                        android:textColor="@color/lcd_feels" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/LcdCell">
+                    <TextView style="@style/LcdLabel" android:text="UV" />
+                    <TextView
+                        android:id="@+id/uv"
+                        style="@style/LcdValue"
+                        android:text="--"
+                        android:textColor="@color/lcd_uv" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/LcdCell">
+                    <TextView style="@style/LcdLabel" android:text="SVĚTLO klux" />
+                    <TextView
+                        android:id="@+id/light"
+                        style="@style/LcdValue"
+                        android:text="--"
+                        android:textColor="@color/lcd_light" />
+                </LinearLayout>
+
+                <LinearLayout
+                    style="@style/LcdCell"
+                    android:gravity="end">
+                    <TextView style="@style/LcdLabel" android:text="TLAK hPa" />
+                    <TextView
+                        android:id="@+id/pressure"
+                        style="@style/LcdValue"
+                        android:text="--"
+                        android:textColor="@color/lcd_baro" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView style="@style/LcdHLine" />
+
+            <!-- ===== řádek 3: SRÁŽKY | ROSNÝ BOD | ČIDLA ===== -->
+            <LinearLayout
+                android:id="@+id/row3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/LcdCell">
+                    <TextView style="@style/LcdLabel" android:text="SRÁŽKY DNES" />
+                    <TextView
+                        android:id="@+id/rain"
+                        style="@style/LcdValue"
+                        android:text="--"
+                        android:textColor="@color/lcd_rain" />
+                    <TextView
+                        android:id="@+id/rain_rate"
+                        style="@style/LcdLabel"
+                        android:textColor="@color/lcd_rain"
+                        android:textStyle="normal"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/LcdCell">
+                    <TextView style="@style/LcdLabel" android:text="ROSNÝ BOD" />
+                    <TextView
+                        android:id="@+id/dew"
+                        style="@style/LcdValue"
+                        android:text="--"
+                        android:textColor="@color/lcd_feels" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/sensors_cell"
+                    style="@style/LcdCell"
+                    android:layout_weight="2"
+                    android:gravity="end"
+                    android:visibility="gone">
+                    <TextView
+                        android:id="@+id/sensors_label"
+                        style="@style/LcdLabel"
+                        android:text="ČIDLA" />
+                    <TextView
+                        android:id="@+id/sensors"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-condensed"
+                        android:gravity="end"
+                        android:textColor="@color/lcd_sensor"
+                        android:textSize="15sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <TextView style="@style/LcdVLine" android:layout_marginStart="14dp" android:layout_marginEnd="14dp" />
+
+        <!-- graf tlaku -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <!-- ===== vývoj tlaku za 24 h (jako HISTORY BARO na stanici) ===== -->
+            <LinearLayout
+                android:id="@+id/graph_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                >
+
+        
+                <TextView
+                    android:id="@+id/graph_title"
+                    style="@style/LcdLabel"
+                    android:layout_width="match_parent"
+                    android:layout_marginTop="5dp"
+                    android:ellipsize="end"
+                    android:text="TLAK 24 H"
+                    android:textColor="@color/lcd_baro" />
+
+                <ImageView
+                    android:id="@+id/pressure_graph"
+                    android:layout_width="match_parent"
+                    android:layout_height="110dp"
+                    android:layout_marginTop="2dp"
+                    android:scaleType="fitXY" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ===== předpověď (jako HISTORY na stanici) ===== -->
+    <LinearLayout
+        android:id="@+id/forecast_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="bottom"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView style="@style/LcdHLine" />
+
+        <TextView
+            android:id="@+id/forecast_title"
+            style="@style/LcdLabel"
+            android:layout_width="match_parent"
+            android:layout_marginTop="5dp"
+            android:ellipsize="end"
+            android:textColor="@color/lcd_baro" />
+
+        <LinearLayout
+            android:id="@+id/forecast_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal" />
+    </LinearLayout>
+
+    <!-- ===== spodní lišta: čas synchronizace, aktualizace, nastavení ===== -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            style="@style/LcdLabel"
+            android:text="SYNC "
+            android:textColor="@color/lcd_dim" />
+
+        <TextView
+            android:id="@+id/updated"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-condensed"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="@color/lcd_wind"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/update_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/badge_bg"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:text="⬆ nová verze"
+            android:textColor="#FF060709"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/settings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="10dp"
+            android:paddingEnd="4dp"
+            android:text="⚙"
+            android:textColor="@color/lcd_dim"
+            android:textSize="15sp" />
+    </LinearLayout>
+</LinearLayout>

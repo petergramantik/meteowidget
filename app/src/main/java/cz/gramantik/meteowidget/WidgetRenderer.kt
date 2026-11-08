@@ -33,7 +33,7 @@ object WidgetRenderer {
     fun showRefreshing(ctx: Context) = updateAll(ctx, refreshing = true)
 
     /** Data sdílená všemi rozloženími při jednom překreslení. */
-    private class State(ctx: Context, val refreshing: Boolean) {
+    class State(ctx: Context, val refreshing: Boolean) {
         val p = Prefs(ctx)
         /** jedna bitmapa sdílená všemi rozloženími (RemoteViews ji pošle jen jednou) */
         val graph: Bitmap by lazy { PressureHistory.render(ctx) }
@@ -109,8 +109,21 @@ object WidgetRenderer {
         return v
     }
 
-    private fun buildFull(ctx: Context, s: State, withForecast: Boolean, withGraph: Boolean): RemoteViews {
-        val v = RemoteViews(ctx.packageName, R.layout.widget_full)
+    /** Celoobrazovkový panel pro televizi – stejné prvky, jiné rozložení. */
+    fun buildTv(ctx: Context): RemoteViews {
+        val s = State(ctx, false)
+        return buildFull(
+            ctx, s, withForecast = true, withGraph = true,
+            layout = R.layout.tv_dashboard,
+            graph = PressureHistory.render(ctx, widthDp = 300, heightDp = 110),
+        )
+    }
+
+    private fun buildFull(
+        ctx: Context, s: State, withForecast: Boolean, withGraph: Boolean,
+        layout: Int = R.layout.widget_full, graph: Bitmap? = null,
+    ): RemoteViews {
+        val v = RemoteViews(ctx.packageName, layout)
         header(ctx, v, s)
         v.setOnClickPendingIntent(R.id.settings, settingsIntent(ctx))
         v.setViewVisibility(R.id.update_badge, if (s.updateBadge) View.VISIBLE else View.GONE)
@@ -146,7 +159,7 @@ object WidgetRenderer {
 
         if (withGraph) {
             v.setViewVisibility(R.id.graph_section, View.VISIBLE)
-            v.setImageViewBitmap(R.id.pressure_graph, s.graph)
+            v.setImageViewBitmap(R.id.pressure_graph, graph ?: s.graph)
             v.setTextViewText(
                 R.id.graph_title,
                 "TLAK 24 H" + (s.trend?.let { " · ZA 3 H " + String.format(CZ, "%+.1f hPa", it) } ?: "")

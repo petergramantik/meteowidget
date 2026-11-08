@@ -9,7 +9,9 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
 
@@ -85,6 +87,46 @@ class SettingsActivity : Activity() {
         lat.setText(prefs.lat.toString())
         lon.setText(prefs.lon.toString())
 
+        // ---------- televize ----------
+        val tv = TvPrefs(this)
+        val dayLabel = findViewById<TextView>(R.id.tv_day_label)
+        val nightLabel = findViewById<TextView>(R.id.tv_night_label)
+        val day = findViewById<SeekBar>(R.id.tv_day)
+        val night = findViewById<SeekBar>(R.id.tv_night)
+        val nightOn = findViewById<CheckBox>(R.id.tv_night_on)
+        val nightFrom = findViewById<EditText>(R.id.tv_night_from)
+        val nightTo = findViewById<EditText>(R.id.tv_night_to)
+        day.progress = tv.dayBrightness
+        night.progress = tv.nightBrightness
+        nightOn.isChecked = tv.nightEnabled
+        nightFrom.setText(tv.nightFrom.toString())
+        nightTo.setText(tv.nightTo.toString())
+        fun labels() {
+            dayLabel.text = "Jas ve dne: ${day.progress} %"
+            nightLabel.text = "Jas v noci: ${night.progress} %" + if (night.progress == 0) " (černá obrazovka)" else ""
+        }
+        labels()
+        val seekListener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar, value: Int, fromUser: Boolean) {
+                if (sb === day) tv.dayBrightness = value else tv.nightBrightness = value
+                labels()
+            }
+            override fun onStartTrackingTouch(sb: SeekBar) = Unit
+            override fun onStopTrackingTouch(sb: SeekBar) = Unit
+        }
+        day.setOnSeekBarChangeListener(seekListener)
+        night.setOnSeekBarChangeListener(seekListener)
+        day.keyProgressIncrement = 5
+        night.keyProgressIncrement = 1
+        nightOn.setOnCheckedChangeListener { _, on -> tv.nightEnabled = on }
+        val hourWatcher = { e: EditText, set: (Int) -> Unit ->
+            e.setOnFocusChangeListener { _, has ->
+                if (!has) e.text.toString().toIntOrNull()?.let { set(it) }
+            }
+        }
+        hourWatcher(nightFrom) { tv.nightFrom = it }
+        hourWatcher(nightTo) { tv.nightTo = it }
+
         // ---------- uložit ----------
         val result = findViewById<TextView>(R.id.result)
         val button = findViewById<Button>(R.id.save)
@@ -103,6 +145,8 @@ class SettingsActivity : Activity() {
             prefs.locName = locName.text.toString().ifBlank { "Těmice" }
             lat.text.toString().replace(',', '.').toDoubleOrNull()?.let { prefs.lat = it }
             lon.text.toString().replace(',', '.').toDoubleOrNull()?.let { prefs.lon = it }
+            nightFrom.text.toString().toIntOrNull()?.let { tv.nightFrom = it }
+            nightTo.text.toString().toIntOrNull()?.let { tv.nightTo = it }
             if (credentialsChanged) prefs.clearToken()
             prefs.clearSpec() // při testu vždy znovu načíst měřítka
 
@@ -176,9 +220,14 @@ class SettingsActivity : Activity() {
         }
         if (!packageManager.canRequestPackageInstalls()) {
             updateStatus.text = "Povol aplikaci instalovat aktualizace a vrať se zpět."
-            startActivity(
-                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
-            )
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+                )
+            } catch (e: Exception) {
+                // některé TV boxy tuto obrazovku nemají – povolení se hledá v Nastavení → Zabezpečení
+                updateStatus.text = "Povol v Nastavení → Zabezpečení → Neznámé zdroje aplikaci Meteostanice."
+            }
             return
         }
         updateButton.isEnabled = false

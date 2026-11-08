@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -122,9 +124,33 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    // automatický nový pokus, jakmile je zase internet
+    private val netCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            val p = Prefs(this@MainActivity)
+            if (p.lastError != null || System.currentTimeMillis() - p.lastUpdate > 15 * 60_000L) {
+                runOnUiThread { if (refreshBtn.isEnabled) refreshData() }
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         screens.forEach { it?.refresh() }
+        try {
+            getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(netCallback)
+        } catch (e: Exception) {
+            // nevadí
+        }
+    }
+
+    override fun onPause() {
+        try {
+            getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(netCallback)
+        } catch (e: Exception) {
+            // nebyl registrován
+        }
+        super.onPause()
     }
 
     override fun onDestroy() {

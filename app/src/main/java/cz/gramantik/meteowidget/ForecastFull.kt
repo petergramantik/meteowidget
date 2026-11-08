@@ -17,8 +17,11 @@ data class HourF(
     val code: Int, val cloud: Double, val pressure: Double,
     val wind: Double, val gust: Double, val dir: Double,
     val uv: Double, val visibility: Double, val isDay: Boolean,
+    val cape: Double,
 ) {
     val icon get() = ForecastFull.hourIcon(code, precip, isDay)
+    /** 0 = žádné, 1 = možné, 2 = vysoké riziko bouřek */
+    val storm get() = ForecastFull.stormLevel(code, cape)
 }
 
 data class DayF(
@@ -47,7 +50,7 @@ object ForecastFull {
             "?latitude=${String.format(Locale.US, "%.4f", p.lat)}&longitude=${String.format(Locale.US, "%.4f", p.lon)}" +
             "&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation," +
             "precipitation_probability,snowfall,weather_code,cloud_cover,pressure_msl,wind_speed_10m," +
-            "wind_gusts_10m,wind_direction_10m,uv_index,visibility,is_day" +
+            "wind_gusts_10m,wind_direction_10m,uv_index,visibility,is_day,cape" +
             "&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max," +
             "apparent_temperature_min,precipitation_sum,precipitation_probability_max,precipitation_hours," +
             "snowfall_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,uv_index_max," +
@@ -116,13 +119,13 @@ object ForecastFull {
         val cloud = h.dArr("cloud_cover"); val pres = h.dArr("pressure_msl")
         val wind = h.dArr("wind_speed_10m"); val gust = h.dArr("wind_gusts_10m")
         val dir = h.dArr("wind_direction_10m"); val uv = h.dArr("uv_index")
-        val vis = h.dArr("visibility"); val isDay = h.dArr("is_day")
+        val vis = h.dArr("visibility"); val isDay = h.dArr("is_day"); val cape = h.dArr("cape")
         val hours = ht.mapIndexedNotNull { i, s ->
             val t = s?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() } ?: return@mapIndexedNotNull null
             HourF(
                 t, temp.at(i), feels.at(i), hum.at(i), dew.at(i), pr.at(i).nz(), prob.at(i).toIntOr(-1),
                 snow.at(i).nz(), code.at(i).toIntOr(-1), cloud.at(i), pres.at(i), wind.at(i), gust.at(i),
-                dir.at(i), uv.at(i), vis.at(i), isDay.at(i) != 0.0,
+                dir.at(i), uv.at(i), vis.at(i), isDay.at(i) != 0.0, cape.at(i),
             )
         }
 
@@ -217,6 +220,23 @@ object ForecastFull {
         95 -> "Bouřka"
         96, 99 -> "Bouřka s kroupami"
         else -> "—"
+    }
+
+    /**
+     * Riziko bouřek z předpovědi: bouřka v kódu počasí, nebo vysoká CAPE
+     * (energie pro vznik konvekce, J/kg).
+     */
+    fun stormLevel(code: Int, cape: Double): Int = when {
+        code >= 95 -> 2
+        !cape.isNaN() && cape >= 1000 -> 2
+        !cape.isNaN() && cape >= 400 -> 1
+        else -> 0
+    }
+
+    fun stormText(level: Int) = when (level) {
+        2 -> "⚡ vysoké riziko bouřek"
+        1 -> "⚡ možné bouřky"
+        else -> ""
     }
 
     fun windDir(deg: Double): String = if (deg.isNaN()) "" else Weather.compass(deg)

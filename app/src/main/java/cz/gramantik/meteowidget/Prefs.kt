@@ -45,6 +45,9 @@ class Prefs(ctx: Context) {
     var googleKey: String
         get() = str("googleKey")
         set(v) = put("googleKey", v.trim())
+    var owmKey: String
+        get() = str("owmKey")
+        set(v) = put("owmKey", v.trim())
     var locName: String
         get() = str("locName", "Těmice")
         set(v) = put("locName", v.trim())
@@ -156,5 +159,23 @@ enum class Channel(val key: String, val defaultName: String, val tempCode: Strin
 
     companion object {
         fun fromKey(k: String?) = entries.firstOrNull { it.key == k }
+    }
+}
+
+/** Srozumitelný text chyby pro uživatele. */
+fun friendlyError(raw: String?, lastUpdate: Long): String? {
+    if (raw == null) return null
+    val r = raw.lowercase()
+    val time = if (lastUpdate > 0)
+        java.text.SimpleDateFormat("d.M. HH:mm", java.util.Locale("cs", "CZ")).format(java.util.Date(lastUpdate)) else null
+    val shown = time?.let { " – zobrazuji data z $it" } ?: ""
+    return when {
+        "unable to resolve host" in r || "no address associated" in r || "failed to connect" in r ||
+            "network is unreachable" in r || "connection abort" in r || "connection reset" in r ->
+            "📡 Bez připojení k internetu$shown"
+        "timeout" in r || "timed out" in r -> "⏱ Server Tuya neodpovídá$shown"
+        "token" in r || "sign" in r || "1004" in r || "1010" in r -> "🔑 Chyba přihlášení k Tuya – zkontroluj údaje v nastavení"
+        "28841" in r || "expired" in r -> "⌛ Vypršela zkušební služba Tuya IoT Core – prodluž ji na iot.tuya.com"
+        else -> "⚠ $raw"
     }
 }

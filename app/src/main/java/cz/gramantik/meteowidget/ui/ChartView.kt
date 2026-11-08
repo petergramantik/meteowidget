@@ -36,6 +36,12 @@ class ChartView(ctx: Context) : View(ctx) {
     var series: List<Series> = emptyList()
         set(v) { field = v; touchX = -1f; invalidate() }
 
+    /** Volitelné vodorovné pásmo (např. doporučená vlhkost 40–60 %). */
+    var band: Pair<Double, Double>? = null
+        set(v) { field = v; invalidate() }
+    private val bandPaint = Paint().apply { color = 0x1A3DDC97 }
+    private val dot = Paint(Paint.ANTI_ALIAS_FLAG)
+
     private val d = resources.displayMetrics.density
     private val grid = Paint().apply { color = 0x22FFFFFF; strokeWidth = 1f }
     private val axisText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -98,7 +104,8 @@ class ChartView(ctx: Context) : View(ctx) {
         }
         val main = all.filter { !it.ownAxis }
         val second = all.filter { it.ownAxis }
-        val r1 = range(main.ifEmpty { all }) ?: return
+        var r1 = range(main.ifEmpty { all }) ?: return
+        band?.let { b -> r1 = minOf(r1.first, b.first) to maxOf(r1.second, b.second) }
         val r2 = range(second)
 
         val left = 34f * d
@@ -109,6 +116,8 @@ class ChartView(ctx: Context) : View(ctx) {
         val t1 = all.maxOf { it.times.last() }.let { if (it == t0) t0 + 1 else it }
         fun x(t: Long) = left + (t - t0).toFloat() / (t1 - t0) * (right - left)
         fun y(v: Double, r: Pair<Double, Double>) = (bottom - (v - r.first) / (r.second - r.first) * (bottom - top)).toFloat()
+
+        band?.let { b -> c.drawRect(left, y(b.second, r1), right, y(b.first, r1), bandPaint) }
 
         // mřížka a osa Y
         val steps = 4
@@ -156,12 +165,17 @@ class ChartView(ctx: Context) : View(ctx) {
                 var started = false
                 var prevT = 0L
                 val gap = max(3 * 3_600_000L, span / 40)
+                dot.color = s.color
+                val n = s.times.size
+                fun connected(i: Int, j: Int) = j in 0 until n && !s.values[j].isNaN() && abs(s.times[j] - s.times[i]) <= gap
                 for (i in s.times.indices) {
                     val v = s.values[i]
                     if (v.isNaN()) { started = false; continue }
                     val xx = x(s.times[i]); val yy = y(v, r)
                     if (!started || s.times[i] - prevT > gap) p.moveTo(xx, yy) else p.lineTo(xx, yy)
                     started = true; prevT = s.times[i]
+                    // osamocený bod (bez sousedů) by čára nevykreslila -> tečka
+                    if (!connected(i, i - 1) && !connected(i, i + 1)) c.drawCircle(xx, yy, 3f * d, dot)
                 }
                 c.drawPath(p, line)
             }
@@ -173,13 +187,14 @@ class ChartView(ctx: Context) : View(ctx) {
             val t = t0 + ((touchX - left) / (right - left) * span).toLong()
             val rows = ArrayList<Pair<String, Int>>()
             rows.add(SimpleDateFormat("EEE d.M. HH:mm", Locale("cs", "CZ")).format(Date(t)) to 0xFFFFFFFF.toInt())
+            val near = max(20 * 60_000L, span / 40)
             for (s in all) {
                 var bi = -1; var bd = Long.MAX_VALUE
                 for (i in s.times.indices) {
                     val dd = abs(s.times[i] - t)
                     if (dd < bd && !s.values[i].isNaN()) { bd = dd; bi = i }
                 }
-                if (bi >= 0) rows.add("${s.name}: ${fmt(s.values[bi])} ${s.unit}".trim() to s.color)
+                if (bi >= 0 && bd <= near) rows.add("${s.name}: ${fmt(s.values[bi])} ${s.unit}".trim() to s.color)
             }
             val lh = 15f * d
             val tw = rows.maxOf { tipText.measureText(it.first) } + 12f * d

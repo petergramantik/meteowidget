@@ -7,81 +7,117 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   html, body { margin: 0; height: 100%; background: #060709; color: #fff; font-family: sans-serif; }
-  #map { position: absolute; inset: 0 0 92px 0; background: #060709; }
-  #panel { position: absolute; left: 0; right: 0; bottom: 0; height: 92px; padding: 8px 14px;
+  #map { position: absolute; inset: 0 0 128px 0; background: #060709; }
+  /* OpenStreetMap ztmavená do LCD stylu */
+  .osm-dark { filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(85%) saturate(60%); }
+
+  #search { position: absolute; top: 10px; left: 56px; right: 10px; z-index: 1000; }
+  #searchRow { display: flex; gap: 6px; }
+  #q { flex: 1; height: 38px; border-radius: 19px; border: 1px solid rgba(255,255,255,.25); background: rgba(16,19,23,.92);
+       color: #fff; padding: 0 14px; font-size: 15px; outline: none; }
+  .btn { height: 38px; min-width: 38px; border-radius: 19px; border: 1px solid rgba(255,255,255,.25);
+         background: rgba(16,19,23,.92); color: #fff; font-size: 17px; }
+  #results { margin-top: 6px; background: rgba(16,19,23,.97); border-radius: 12px; overflow: hidden; display: none;
+             border: 1px solid rgba(255,255,255,.2); }
+  .res { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.1); font-size: 14px; }
+  .res small { color: rgba(255,255,255,.55); }
+
+  #panel { position: absolute; left: 0; right: 0; bottom: 0; height: 128px; padding: 8px 12px;
            box-sizing: border-box; background: #0b0d10; border-top: 1px solid rgba(255,255,255,.2); }
   #row { display: flex; align-items: center; gap: 12px; }
-  #play { width: 44px; height: 44px; border-radius: 22px; border: 0; background: #ffd54f; color: #060709;
-          font-size: 20px; font-weight: bold; }
-  #time { font-size: 18px; color: #cfe3ff; font-family: sans-serif-condensed, sans-serif; min-width: 110px; }
+  #play { width: 42px; height: 42px; border-radius: 21px; border: 0; background: #ffd54f; color: #060709;
+          font-size: 18px; font-weight: bold; }
+  #time { font-size: 17px; color: #cfe3ff; min-width: 104px; }
   #slider { flex: 1; accent-color: #ffd54f; }
-  #attr { font-size: 10px; color: rgba(255,255,255,.6); margin-top: 6px; }
+  #layers { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; white-space: nowrap; }
+  .chip { flex: none; padding: 6px 12px; border-radius: 14px; font-size: 13px; border: 1px solid rgba(255,255,255,.25);
+          background: #171b21; color: #fff; }
+  .chip.on { background: #ffd54f; color: #060709; border-color: #ffd54f; font-weight: bold; }
+  .chip.off { opacity: .45; }
+  #attr { font-size: 10px; color: rgba(255,255,255,.6); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #attr a { color: rgba(255,255,255,.8); }
-  #msg { position: absolute; top: 40%; width: 100%; text-align: center; color: rgba(255,255,255,.7); z-index: 999; }
+  #msg { position: absolute; top: 40%; width: 100%; text-align: center; color: rgba(255,255,255,.75); z-index: 999; pointer-events: none; }
   .leaflet-control-attribution { display: none; }
-  .pin { width: 14px; height: 14px; border-radius: 7px; background: #ffd54f; border: 2px solid #060709;
-         box-shadow: 0 0 0 2px #ffd54f; }
+  .pin { width: 14px; height: 14px; border-radius: 7px; background: #ffd54f; border: 2px solid #060709; box-shadow: 0 0 0 2px #ffd54f; }
+  .pin2 { width: 12px; height: 12px; border-radius: 6px; background: #3ddc97; border: 2px solid #060709; box-shadow: 0 0 0 2px #3ddc97; }
+  #legend { position: absolute; right: 10px; bottom: 136px; z-index: 1000; font-size: 11px; color: rgba(255,255,255,.75);
+            background: rgba(16,19,23,.85); padding: 4px 8px; border-radius: 8px; display: none; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="msg">Načítám radar…</div>
+
+<div id="search">
+  <div id="searchRow">
+    <input id="q" type="search" placeholder="Hledat místo…" autocomplete="off">
+    <button class="btn" id="home" title="Domů">⌂</button>
+  </div>
+  <div id="results"></div>
+</div>
+<div id="legend"></div>
+
 <div id="panel">
   <div id="row">
     <button id="play">▶</button>
     <div id="time">--:--</div>
     <input id="slider" type="range" min="0" max="0" value="0">
   </div>
+  <div id="layers"></div>
   <div id="attr">Radar: <a href="https://www.rainviewer.com/">Weather data by RainViewer</a> ·
-    Mapa: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a></div>
+    Mapa: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ·
+    Hledání: <a href="https://open-meteo.com/">Open-Meteo</a><span id="owmAttr"></span></div>
 </div>
+
 <script>
-  var lat = parseFloat('__LAT__'), lon = parseFloat('__LON__'), placeName = '__NAME__';
+  var lat = parseFloat('__LAT__'), lon = parseFloat('__LON__'), placeName = '__NAME__', owmKey = '__OWM__';
   var msg = document.getElementById('msg');
 
   if (typeof L === 'undefined') {
     msg.textContent = 'Mapu se nepodařilo načíst – zkontroluj připojení.';
   } else {
     var map = L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 7);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      subdomains: 'abcd', maxZoom: 12
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 12, className: 'osm-dark'
     }).addTo(map);
     L.marker([lat, lon], { icon: L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [18, 18] }) })
       .addTo(map).bindTooltip(placeName || 'Stanice');
 
+    // ---------- radar ----------
     var host = '', frames = [], layers = {}, idx = 0, timer = null;
+    var showRadar = true, snow = true, overlay = null, overlayLayer = null;
     var slider = document.getElementById('slider'), timeEl = document.getElementById('time'),
         playBtn = document.getElementById('play');
 
+    function radarUrl(f) {
+      // bezplatné API: max. přiblížení 7, barevné schéma 2, vyhlazení 1, sníh zvlášť 1/0
+      return host + f.path + '/256/{z}/{x}/{y}/2/1_' + (snow ? '1' : '0') + '.png';
+    }
     function layerFor(f) {
       if (!layers[f.path]) {
-        // bezplatné API: max. přiblížení 7, barevné schéma 2 (Universal Blue), vyhlazení, sníh
-        layers[f.path] = L.tileLayer(host + f.path + '/256/{z}/{x}/{y}/2/1_1.png', {
-          opacity: 0, maxNativeZoom: 7, maxZoom: 12, tileSize: 256, zIndex: 10
-        }).addTo(map);
+        layers[f.path] = L.tileLayer(radarUrl(f), { opacity: 0, maxNativeZoom: 7, maxZoom: 12, zIndex: 10 }).addTo(map);
       }
       return layers[f.path];
     }
-
+    function clearRadar() {
+      Object.keys(layers).forEach(function (k) { map.removeLayer(layers[k]); });
+      layers = {};
+    }
     function show(i) {
       if (!frames.length) return;
       idx = (i + frames.length) % frames.length;
-      frames.forEach(function (f, j) { if (layers[f.path]) layers[f.path].setOpacity(j === idx ? 0.75 : 0); });
-      layerFor(frames[idx]).setOpacity(0.75);
-      // přednačíst další snímek
-      layerFor(frames[(idx + 1) % frames.length]);
+      frames.forEach(function (f, j) { if (layers[f.path]) layers[f.path].setOpacity(showRadar && j === idx ? 0.8 : 0); });
+      if (showRadar) {
+        layerFor(frames[idx]).setOpacity(0.8);
+        layerFor(frames[(idx + 1) % frames.length]); // přednačíst další
+      }
       var d = new Date(frames[idx].time * 1000);
       timeEl.textContent = d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) +
         (idx === frames.length - 1 ? ' (teď)' : '');
       slider.value = idx;
     }
-
     function stop() { if (timer) { clearInterval(timer); timer = null; } playBtn.textContent = '▶'; }
-    function play() {
-      stop();
-      playBtn.textContent = '❚❚';
-      timer = setInterval(function () { show(idx + 1); }, 600);
-    }
+    function play() { stop(); playBtn.textContent = '❚❚'; timer = setInterval(function () { show(idx + 1); }, 600); }
     playBtn.onclick = function () { timer ? stop() : play(); };
     slider.oninput = function () { stop(); show(parseInt(slider.value, 10)); };
 
@@ -91,8 +127,7 @@
         .then(function (data) {
           host = data.host;
           frames = (data.radar && data.radar.past) ? data.radar.past : [];
-          Object.keys(layers).forEach(function (k) { map.removeLayer(layers[k]); });
-          layers = {};
+          clearRadar();
           slider.max = Math.max(0, frames.length - 1);
           msg.style.display = frames.length ? 'none' : 'block';
           if (!frames.length) msg.textContent = 'Radarová data nejsou k dispozici.';
@@ -101,8 +136,89 @@
         })
         .catch(function () { msg.style.display = 'block'; msg.textContent = 'Radar se nepodařilo načíst.'; });
     };
+
+    // ---------- vrstvy ----------
+    var OWM = [
+      { id: 'clouds_new', name: 'Oblačnost', legend: 'Oblačnost: světlejší = víc mraků' },
+      { id: 'temp_new', name: 'Teplota', legend: 'Teplota: modrá chladno → červená teplo' },
+      { id: 'wind_new', name: 'Vítr', legend: 'Vítr: sytější = silnější' },
+    ];
+    var layersEl = document.getElementById('layers'), legendEl = document.getElementById('legend');
+    function chip(text, cls, onClick) {
+      var b = document.createElement('button');
+      b.className = 'chip ' + cls; b.textContent = text; b.onclick = onClick;
+      layersEl.appendChild(b);
+    }
+    function drawChips() {
+      layersEl.innerHTML = '';
+      chip('🌧 Srážky', showRadar ? 'on' : '', function () { showRadar = !showRadar; show(idx); drawChips(); });
+      chip('❄ Sníh zvlášť', snow ? 'on' : '', function () { snow = !snow; clearRadar(); show(idx); drawChips(); });
+      OWM.forEach(function (o) {
+        chip(o.name, !owmKey ? 'off' : (overlay === o.id ? 'on' : ''), function () {
+          if (!owmKey) { alertMsg('Pro vrstvu „' + o.name + '“ zadej v nastavení klíč OpenWeatherMap.'); return; }
+          setOverlay(overlay === o.id ? null : o.id);
+        });
+      });
+    }
+    function setOverlay(id) {
+      if (overlayLayer) { map.removeLayer(overlayLayer); overlayLayer = null; }
+      overlay = id;
+      legendEl.style.display = 'none';
+      if (id) {
+        overlayLayer = L.tileLayer('https://tile.openweathermap.org/map/' + id + '/{z}/{x}/{y}.png?appid=' + owmKey,
+          { opacity: 0.65, maxZoom: 12, zIndex: 5 }).addTo(map);
+        var o = OWM.filter(function (x) { return x.id === id; })[0];
+        legendEl.textContent = o.legend; legendEl.style.display = 'block';
+      }
+      drawChips();
+    }
+    var alertTimer = null;
+    function alertMsg(t) {
+      msg.textContent = t; msg.style.display = 'block';
+      clearTimeout(alertTimer);
+      alertTimer = setTimeout(function () { msg.style.display = 'none'; }, 3500);
+    }
+    if (owmKey) document.getElementById('owmAttr').innerHTML = ' · Vrstvy: <a href="https://openweathermap.org/">OpenWeather</a>';
+    drawChips();
+
+    // ---------- hledání místa ----------
+    var q = document.getElementById('q'), res = document.getElementById('results'), found = null, searchTimer = null;
+    function search(text) {
+      if (text.trim().length < 2) { res.style.display = 'none'; return; }
+      fetch('https://geocoding-api.open-meteo.com/v1/search?count=6&language=cs&format=json&name=' + encodeURIComponent(text))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var list = data.results || [];
+          res.innerHTML = '';
+          if (!list.length) { res.innerHTML = '<div class="res">Nic nenalezeno</div>'; }
+          list.forEach(function (p) {
+            var d = document.createElement('div');
+            d.className = 'res';
+            d.innerHTML = p.name + ' <small>' + [p.admin2, p.admin1, p.country].filter(Boolean).join(', ') + '</small>';
+            d.onclick = function () { goTo(p.latitude, p.longitude, p.name); };
+            res.appendChild(d);
+          });
+          res.style.display = 'block';
+        })
+        .catch(function () { res.innerHTML = '<div class="res">Hledání se nepodařilo</div>'; res.style.display = 'block'; });
+    }
+    function goTo(la, lo, name) {
+      res.style.display = 'none'; q.value = name; q.blur();
+      if (found) map.removeLayer(found);
+      found = L.marker([la, lo], { icon: L.divIcon({ className: '', html: '<div class="pin2"></div>', iconSize: [16, 16] }) })
+        .addTo(map).bindTooltip(name, { permanent: true, direction: 'top', offset: [0, -8] });
+      map.setView([la, lo], 9);
+    }
+    q.oninput = function () { clearTimeout(searchTimer); searchTimer = setTimeout(function () { search(q.value); }, 350); };
+    q.onkeydown = function (e) { if (e.key === 'Enter') { clearTimeout(searchTimer); search(q.value); } };
+    document.getElementById('home').onclick = function () {
+      res.style.display = 'none'; q.value = '';
+      if (found) { map.removeLayer(found); found = null; }
+      map.setView([lat, lon], 7);
+    };
+    map.on('click', function () { res.style.display = 'none'; q.blur(); });
+
     reloadFrames();
-    // obnovovat každých 5 minut
     setInterval(window.reloadFrames, 5 * 60 * 1000);
   }
 </script>

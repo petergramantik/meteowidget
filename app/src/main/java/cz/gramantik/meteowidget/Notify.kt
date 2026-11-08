@@ -28,6 +28,15 @@ class NotifyPrefs(ctx: Context) {
     var uv: Boolean get() = b("nUv", false); set(v) = setB("nUv", v)
     var uvLimit: Float get() = f("nUvLim", 6f); set(v) = setF("nUvLim", v)
     var alerts: Boolean get() = b("nAlerts", true); set(v) = setB("nAlerts", v)
+
+    // hlídání vlhkosti doma
+    var hum: Boolean get() = b("nHum", true); set(v) = setB("nHum", v)
+    var humMin: Float get() = f("nHumMin", 40f); set(v) = setF("nHumMin", v)
+    var humMax: Float get() = f("nHumMax", 60f); set(v) = setF("nHumMax", v)
+
+    /** Která čidla zobrazit v grafu vlhkosti na obrazovce Stanice (1–3). */
+    fun humChart(i: Int): Boolean = b("humChart$i", false)
+    fun setHumChart(i: Int, v: Boolean) = setB("humChart$i", v)
 }
 
 object Notify {
@@ -102,6 +111,18 @@ object Notify {
         if (n.pressure && trend != null && trend <= -n.pressureLimit) {
             once(ctx, "pres", 6 * h) {
                 post(ctx, 4, "⚡ Tlak rychle klesá", "Za 3 hodiny ${f1(trend)} hPa – možná změna počasí nebo bouřka.")
+            }
+        }
+        val hin = w.humIn
+        if (n.hum && hin != null) {
+            if (hin < n.humMin) {
+                once(ctx, "humLow", 6 * h) {
+                    post(ctx, 6, "💧 Nízká vlhkost doma", "Vlhkost doma $hin % – pod ${n.humMin.toInt()} %. Zvlhči vzduch.")
+                }
+            } else if (hin > n.humMax) {
+                once(ctx, "humHigh", 6 * h) {
+                    post(ctx, 7, "💦 Vysoká vlhkost doma", "Vlhkost doma $hin % – nad ${n.humMax.toInt()} %. Vyvětrej.")
+                }
             }
         }
         val uv = w.uv

@@ -71,28 +71,47 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         return f.hours.filter { !it.time.isBefore(now) }
     }
 
-    // ---------- teď ----------
+    // ---------- teď (kompaktní) ----------
     private fun now(f: FullForecast) {
         val h = upcoming(f).firstOrNull() ?: return
         val today = f.days.firstOrNull { it.date == LocalDate.now() }
-        val c = a.card()
+        val c = a.card("Teď · ${h.time.hour}:00")
         val top = a.hbox()
-        top.addView(a.animIcon(h.icon, 96))
+        top.addView(a.animIcon(h.icon, 72))
         val col = a.vbox()
-        col.addView(a.text(deg(h.temp), 52f, C.WHITE, condensed = true))
-        col.addView(a.text(ForecastFull.describe(h.code), 17f, C.LABEL), a.lp(top = 2))
-        today?.let { col.addView(a.text("↑ ${deg(it.tMax)}   ↓ ${deg(it.tMin)}", 15f, C.IN, condensed = true), a.lp(top = 4)) }
-        top.addView(col, a.lp(0, WRAP, 1f, start = 12))
+        val tempRow = a.hbox(Gravity.BOTTOM)
+        tempRow.addView(a.text(deg(h.temp), 42f, C.WHITE, condensed = true))
+        today?.let {
+            tempRow.addView(a.vbox().apply {
+                addView(a.text("dnes max ${deg(it.tMax)}", 12f, C.IN, condensed = true))
+                addView(a.text("dnes min ${deg(it.tMin)}", 12f, 0xFF8FB3FF.toInt(), condensed = true))
+            }, a.lp(WRAP, WRAP, start = 10))
+        }
+        col.addView(tempRow)
+        col.addView(a.text(ForecastFull.describe(h.code), 15f, C.LABEL), a.lp(top = 2))
+        top.addView(col, a.lp(0, WRAP, 1f, start = 10))
         c.addView(top)
-        val tiles = listOf(
-            a.tile("Pocitově", deg(h.feels), C.FEELS),
-            a.tile("Srážky", "${f1(h.precip)} mm", C.RAIN, if (h.prob >= 0) "pravděpodobnost ${h.prob} %" else null),
-            a.tile("Vítr", "${h.wind.roundToInt()} km/h", C.WIND, "nárazy ${h.gust.roundToInt()} · ${ForecastFull.windDir(h.dir)}"),
-            a.tile("Vlhkost", "${h.hum.roundToInt()} %", C.OUT, "rosný bod ${deg(h.dew)}"),
-            a.tile("Tlak", "${h.pressure.roundToInt()} hPa", C.BARO),
-            a.tile("Oblačnost", "${h.cloud.roundToInt()} %", C.LABEL, "viditelnost ${(h.visibility / 1000).roundToInt()} km"),
+
+        // drobné řádky po třech hodnotách
+        fun mini(label: String, value: String, color: Int) = a.vbox().apply {
+            addView(a.text(label, 10f, C.DIM, bold = true).apply { letterSpacing = 0.06f })
+            addView(a.text(value, 14f, color, condensed = true), a.lp(WRAP, WRAP, top = 1))
+        }
+        val items = listOf(
+            mini("POCITOVĚ", deg(h.feels), C.FEELS),
+            mini("SRÁŽKY", "${f1(h.precip)} mm" + if (h.prob >= 0) " · ${h.prob} %" else "", C.RAIN),
+            mini("VÍTR", "${h.wind.roundToInt()} (${h.gust.roundToInt()}) km/h ${ForecastFull.windDir(h.dir)}", C.WIND),
+            mini("VLHKOST", "${h.hum.roundToInt()} % · rb ${deg(h.dew)}", C.OUT),
+            mini("TLAK", "${h.pressure.roundToInt()} hPa", C.BARO),
+            mini("OBLAČNOST", "${h.cloud.roundToInt()} % · ${(h.visibility / 1000).roundToInt()} km", C.LABEL),
         )
-        c.addView(a.grid(tiles), a.lp(top = 12))
+        items.chunked(3).forEach { rowItems ->
+            val r = a.hbox(Gravity.TOP)
+            rowItems.forEach { r.addView(it, a.lp(0, WRAP, 1f)) }
+            c.addView(r, a.lp(top = 8))
+        }
+        val storm = upcoming(f).take(12).maxOfOrNull { it.storm } ?: 0
+        if (storm > 0) c.addView(a.text(ForecastFull.stormText(storm) + " v příštích 12 h", 13f, C.ACCENT, bold = true), a.lp(top = 8))
         content.addView(c, a.lp(bottom = 4))
     }
 
@@ -101,15 +120,6 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         val hs = upcoming(f).take(count)
         if (hs.isEmpty()) return
         val c = a.card(if (count <= 48) "Příštích 48 hodin" else "3 dny po hodinách")
-        val times = hs.map { ms(it.time) }.toLongArray()
-        c.addView(ChartView(a).apply {
-            series = listOf(
-                Series("Teplota", C.IN, times, hs.map { it.temp }.toDoubleArray(), unit = "°C"),
-                Series("Pocitově", C.FEELS, times, hs.map { it.feels }.toDoubleArray(), unit = "°C"),
-                Series("Srážky", C.RAIN, times, hs.map { it.precip }.toDoubleArray(), bars = true, unit = "mm", ownAxis = true),
-            )
-        }, a.lp(h = a.dp(210)))
-        c.addView(a.text("● teplota  ● pocitově  ▮ srážky (mm, pravá osa)", 11f, C.DIM), a.lp(top = 4, bottom = 8))
 
         if (!list) {
             // vodorovný pás hodin
@@ -126,6 +136,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                 cell.addView(a.text(if (h.precip >= 0.1) "${f1(h.precip)} mm" else " ", 11f, C.RAIN), a.lp(WRAP, WRAP, top = 2))
                 cell.addView(a.text(if (h.prob >= 0) "${h.prob} %" else " ", 11f, C.RAIN))
                 cell.addView(a.text("${h.wind.roundToInt()} km/h", 11f, C.WIND), a.lp(WRAP, WRAP, top = 2))
+                cell.addView(a.text(if (h.storm > 0) "⚡" else " ", 12f, C.ACCENT))
                 row.addView(cell, a.lp(a.dp(70), WRAP, end = 6))
             }
             c.addView(HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(row) })
@@ -144,11 +155,21 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                 r.addView(a.text(if (h.precip >= 0.1) "${f1(h.precip)} mm" else "", 12f, C.RAIN), a.lp(a.dp(52), WRAP))
                 r.addView(a.text(if (h.prob > 0) "${h.prob} %" else "", 12f, C.RAIN), a.lp(a.dp(38), WRAP))
                 r.addView(a.text("${h.wind.roundToInt()}/${h.gust.roundToInt()} ${ForecastFull.windDir(h.dir)}", 12f, C.WIND, condensed = true), a.lp(0, WRAP, 1f))
-                r.addView(a.text("☁${h.cloud.roundToInt()}%", 11f, C.DIM))
+                r.addView(a.text((if (h.storm > 0) "⚡ " else "") + "☁${h.cloud.roundToInt()}%", 11f, if (h.storm > 0) C.ACCENT else C.DIM))
                 c.addView(r, a.lp(bottom = 2))
             }
             c.addView(a.text("vítr: průměr/nárazy km/h", 11f, C.DIM), a.lp(top = 6))
         }
+        // graf až pod výpisem
+        val times = hs.map { ms(it.time) }.toLongArray()
+        c.addView(ChartView(a).apply {
+            series = listOf(
+                Series("Teplota", C.IN, times, hs.map { it.temp }.toDoubleArray(), unit = "°C"),
+                Series("Pocitově", C.FEELS, times, hs.map { it.feels }.toDoubleArray(), unit = "°C"),
+                Series("Srážky", C.RAIN, times, hs.map { it.precip }.toDoubleArray(), bars = true, unit = "mm", ownAxis = true),
+            )
+        }, a.lp(h = a.dp(210), top = 12))
+        c.addView(a.text("● teplota  ● pocitově  ▮ srážky (mm, pravá osa)", 11f, C.DIM), a.lp(top = 4))
         content.addView(c, a.lp(bottom = 10))
     }
 
@@ -157,15 +178,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         val ds = f.days.filter { !it.date.isBefore(LocalDate.now()) }
         if (ds.isEmpty()) return
         val c = a.card("${ds.size} dní")
-        val times = ds.map { ms(it.date.atTime(12, 0)) }.toLongArray()
-        c.addView(ChartView(a).apply {
-            series = listOf(
-                Series("Max", C.IN, times, ds.map { it.tMax }.toDoubleArray(), unit = "°C"),
-                Series("Min", 0xFF8FB3FF.toInt(), times, ds.map { it.tMin }.toDoubleArray(), unit = "°C"),
-                Series("Srážky", C.RAIN, times, ds.map { it.precip }.toDoubleArray(), bars = true, unit = "mm", ownAxis = true),
-            )
-        }, a.lp(h = a.dp(200)))
-        c.addView(a.text("Klepni na den pro podrobnosti", 11f, C.DIM), a.lp(top = 4, bottom = 6))
+        c.addView(a.text("Klepni na den pro podrobnosti", 11f, C.DIM), a.lp(bottom = 6))
         val tf = DateTimeFormatter.ofPattern("HH:mm")
         for (d in ds) {
             val box = a.vbox().apply {
@@ -183,6 +196,9 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                 if (d.precip >= 0.1 || d.prob > 0) {
                     addView(a.text("${f1(d.precip)} mm · ${d.prob.coerceAtLeast(0)} %", 12f, C.RAIN), a.lp(top = 2))
                 }
+                val storm = f.hours.filter { it.time.toLocalDate() == d.date }.maxOfOrNull { it.storm }
+                    ?: ForecastFull.stormLevel(d.code, Double.NaN)
+                if (storm > 0) addView(a.text(ForecastFull.stormText(storm), 12f, C.ACCENT), a.lp(top = 2))
             }, a.lp(0, WRAP, 1f, start = 8))
             r.addView(a.text(deg(d.tMax), 18f, C.IN, condensed = true), a.lp(WRAP, WRAP, end = 8))
             r.addView(a.text(deg(d.tMin), 16f, 0xFF8FB3FF.toInt(), condensed = true))
@@ -216,6 +232,15 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             }
             c.addView(box, a.lp(bottom = 6))
         }
+        val times = ds.map { ms(it.date.atTime(12, 0)) }.toLongArray()
+        c.addView(ChartView(a).apply {
+            series = listOf(
+                Series("Max", C.IN, times, ds.map { it.tMax }.toDoubleArray(), unit = "°C"),
+                Series("Min", 0xFF8FB3FF.toInt(), times, ds.map { it.tMin }.toDoubleArray(), unit = "°C"),
+                Series("Srážky", C.RAIN, times, ds.map { it.precip }.toDoubleArray(), bars = true, unit = "mm", ownAxis = true),
+            )
+        }, a.lp(h = a.dp(200), top = 8))
+        c.addView(a.text("● max  ● min  ▮ srážky (mm, pravá osa)", 11f, C.DIM), a.lp(top = 4))
         content.addView(c, a.lp(bottom = 10))
     }
 

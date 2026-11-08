@@ -21,6 +21,8 @@ import cz.gramantik.meteowidget.Prefs
 import cz.gramantik.meteowidget.PressureHistory
 import cz.gramantik.meteowidget.Sample
 import cz.gramantik.meteowidget.Weather
+import cz.gramantik.meteowidget.NotifyPrefs
+import cz.gramantik.meteowidget.friendlyError
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.ZoneId
@@ -58,13 +60,15 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         val w = data?.let { Weather(it, p.spec) }
 
         // stav
-        val status = when {
-            !p.isConfigured -> "Nejdřív zadej údaje z Tuya v nastavení (⚙)."
-            p.lastError != null -> "⚠ ${p.lastError}"
-            p.lastUpdate > 0 -> "Aktualizováno ${dateTime(p.lastUpdate)}"
-            else -> "Načítám…"
+        val age = System.currentTimeMillis() - p.lastUpdate
+        val (status, statusColor) = when {
+            !p.isConfigured -> "Nejdřív zadej údaje z Tuya v nastavení (⚙)." to C.ACCENT
+            p.lastError != null -> (friendlyError(p.lastError, p.lastUpdate) ?: "") to C.ACCENT
+            p.lastUpdate > 0 && age > 45 * 60_000L -> "⚠ Data jsou stará ${age / 60_000} min (poslední ${dateTime(p.lastUpdate)})" to C.ACCENT
+            p.lastUpdate > 0 -> "Aktualizováno ${dateTime(p.lastUpdate)}" to C.DIM
+            else -> "Načítám…" to C.DIM
         }
-        content.addView(a.text(status, 12f, C.DIM), a.lp(bottom = 8))
+        content.addView(a.text(status, 12f, statusColor), a.lp(bottom = 8))
 
         alerts()
         if (w != null) {
@@ -123,6 +127,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             sensors.forEach { big.addView(a.text(it, 16f, C.SENSOR, condensed = true), a.lp(bottom = 2)) }
         }
         content.addView(big, a.lp(bottom = 10))
+        humidityChart(p)
 
         val trend = PressureHistory.trend3h(a)
         val arrow = when { trend == null -> ""; trend >= 1 -> " ↗"; trend <= -1 -> " ↘"; else -> " →" }
@@ -142,6 +147,35 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
                 C.OUT),
         )
         content.addView(a.grid(tiles), a.lp(bottom = 2))
+    }
+
+    /** Graf vlhkosti za 24 h přes celou šířku, s vyznačeným doporučeným pásmem. */
+    private fun humidityChart(p: Prefs) {
+        val n = NotifyPrefs(a)
+        val now = System.currentTimeMillis()
+        val samples = MeteoDb.get(a).range(now - 24 * 3_600_000L, now)
+        fun s(col: String, name: String, color: Int): Series? {
+            val list = samples.filter { it.get(col) != null }
+            if (list.isEmpty()) return null
+            return Series(name, color, list.map { it.t }.toLongArray(), list.map { it.get(col)!! }.toDoubleArray(), unit = "%")
+        }
+        val series = listOfNotNull(
+            s("hin", p.channelName(Channel.IN), C.IN),
+            s("hout", p.channelName(Channel.OUT), C.OUT),
+            if (n.humChart(1)) s("h1", p.channelName(Channel.S1), C.SENSOR) else null,
+            if (n.humChart(2)) s("h2", p.channelName(Channel.S2), 0xFF9FA8DA.toInt()) else null,
+            if (n.humChart(3)) s("h3", p.channelName(Channel.S3), 0xFFCE93D8.toInt()) else null,
+        )
+        val c = a.card("Vlhkost – 24 h")
+        c.addView(ChartView(a).apply {
+            this.series = series
+            if (n.hum) band = n.humMin.toDouble() to n.humMax.toDouble()
+        }, a.lp(h = a.dp(190)))
+        val legend = a.hbox()
+        series.forEach { legend.addView(a.text("● ${it.name}  ", 12f, it.color)) }
+        if (n.hum) legend.addView(a.text("▮ ${n.humMin.toInt()}–${n.humMax.toInt()} %", 12f, C.OUT))
+        c.addView(legend, a.lp(top = 4))
+        content.addView(c, a.lp(bottom = 10))
     }
 
     private fun uvText(uv: Double?): String? = uv?.let {
@@ -190,12 +224,18 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
                 Triple("🪟 Vyvětrej", C.OUT, "Venkovní vzduch je sušší. Po vyvětrání klesne vlhkost doma přibližně na ${rhAfter.toInt()} %.")
             aout > ain + 0.5 ->
                 Triple("🚫 Nevětrej kvůli vlhkosti", C.DIR, "Venku je vlhčí vzduch (${f1(aout)} g/m³ proti ${f1(ain)} g/m³ doma) – vlhkost doma by stoupla.")
-            hi < 35 ->
+            hi < NotifyPrefs(a).humMin ->
                 Triple("💧 Doma je sucho", C.RAIN, "Vlhkost $hi %. Větráním se nezvýší – venkovní vzduch má po ohřátí jen asi ${rhAfter.toInt()} %.")
             else ->
                 Triple("👍 Vlhkost v pořádku", C.OUT, "Doma $hi % (${f1(ain)} g/m³), venku ${f1(aout)} g/m³. Větrej podle potřeby.")
         }
         val c = a.card("Větrání")
+        val n = NotifyPrefs(a)
+        if (n.hum && hi < n.humMin) {
+            c.addView(a.text("⚠ Vlhkost doma $hi % – pod ${n.humMin.toInt()} %, zvlhčuj", 16f, C.ACCENT, bold = true), a.lp(bottom = 6))
+        } else if (n.hum && hi > n.humMax) {
+            c.addView(a.text("⚠ Vlhkost doma $hi % – nad ${n.humMax.toInt()} %, hrozí plíseň", 16f, C.ACCENT, bold = true), a.lp(bottom = 6))
+        }
         c.addView(a.text(head, 17f, color, bold = true))
         c.addView(a.text(msg + if (to < 5) " Při chladu větrej krátce a intenzivně." else "", 13f, C.LABEL), a.lp(top = 4))
         content.addView(c, a.lp(bottom = 10))

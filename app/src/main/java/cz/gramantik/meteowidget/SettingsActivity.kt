@@ -115,6 +115,39 @@ class SettingsActivity : Activity() {
         bindCheck(R.id.n_alerts, np.alerts) { np.alerts = it }
         val region = findViewById<EditText>(R.id.alert_region)
         region.setText(Alerts.region(this))
+        bindCheck(R.id.n_hum, np.hum) { np.hum = it }
+        bindNum(R.id.n_hum_min, np.humMin) { np.humMin = it }
+        bindNum(R.id.n_hum_max, np.humMax) { np.humMax = it }
+        listOf(R.id.hum_chart_1, R.id.hum_chart_2, R.id.hum_chart_3).forEachIndexed { i, id ->
+            bindCheck(id, np.humChart(i + 1)) { np.setHumChart(i + 1, it) }
+        }
+
+        // ---------- radar ----------
+        val owm = findViewById<EditText>(R.id.owm_key)
+        owm.setText(prefs.owmKey)
+
+        // ---------- historie ----------
+        val backfillResult = findViewById<TextView>(R.id.backfill_result)
+        backfillResult.text = backfillStats()
+        findViewById<Button>(R.id.backfill).setOnClickListener { btn ->
+            if (!prefs.isConfigured) {
+                backfillResult.text = "Nejdřív vyplň údaje z Tuya."
+                return@setOnClickListener
+            }
+            btn.isEnabled = false
+            backfillResult.text = "Stahuji historii z Tuya… (může trvat i minutu)"
+            Thread {
+                val n = try {
+                    HistoryBackfill.run(this, prefs, TuyaClient(prefs))
+                } catch (e: Exception) {
+                    -1
+                }
+                runOnUiThread {
+                    btn.isEnabled = true
+                    backfillResult.text = (if (n >= 0) "Vloženo $n nových záznamů.\n\n" else "Doplnění selhalo.\n\n") + backfillStats()
+                }
+            }.start()
+        }
 
         // ---------- televize ----------
         val tv = TvPrefs(this)
@@ -179,6 +212,7 @@ class SettingsActivity : Activity() {
             lon.text.toString().replace(',', '.').toDoubleOrNull()?.let { prefs.lon = it }
             numFields.forEach { (e, set) -> e.text.toString().replace(',', '.').toFloatOrNull()?.let(set) }
             Alerts.setRegion(this, region.text.toString())
+            prefs.owmKey = owm.text.toString()
             nightFrom.text.toString().toIntOrNull()?.let { tv.nightFrom = it }
             nightTo.text.toString().toIntOrNull()?.let { tv.nightTo = it }
             if (credentialsChanged) prefs.clearToken()
@@ -198,11 +232,20 @@ class SettingsActivity : Activity() {
         }
     }
 
+    private fun backfillStats(): String {
+        val st = HistoryBackfill.stats(this)
+        if (st.isEmpty()) return "Doplnění historie zatím neproběhlo."
+        val t = HistoryBackfill.lastRun(this)
+        return "Poslední doplnění: " +
+            java.text.SimpleDateFormat("d.M. HH:mm", java.util.Locale("cs", "CZ")).format(java.util.Date(t)) + "\n" +
+            st.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+    }
+
     private fun report(): String = buildString {
         if (!prefs.isConfigured) {
             append("⚠ Stanice: vyplň Access ID, Access Secret a Device ID.\n")
         } else if (prefs.lastError != null) {
-            append("❌ Stanice: ${prefs.lastError}\n")
+            append("❌ Stanice: ${friendlyError(prefs.lastError, 0)}\n   (${prefs.lastError})\n")
         } else {
             append("✅ Stanice funguje, obnova každých 15 min.\n")
         }

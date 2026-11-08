@@ -97,7 +97,7 @@ object ForecastClient {
         return (0 until time.length()).map { i ->
             ForecastDay(
                 date = time.getString(i),
-                icon = wmoIcon(code.optInt(i, -1)),
+                icon = wmoIcon(code.optInt(i, -1), pr.optDouble(i, 0.0)),
                 tMax = max.optDouble(i, Double.NaN),
                 tMin = min.optDouble(i, Double.NaN),
                 precipMm = pr.optDouble(i, 0.0).let { if (it.isNaN()) 0.0 else it },
@@ -106,18 +106,34 @@ object ForecastClient {
         }
     }
 
-    /** WMO kód počasí -> název ikony Meteocons */
-    private fun wmoIcon(c: Int) = when (c) {
+    /** Ikona deště podle množství srážek za den (počet kapek 1–4). */
+    private fun rainIcon(mm: Double) = when {
+        mm.isNaN() || mm < 1 -> "rain-1"
+        mm < 5 -> "rain-2"
+        mm < 15 -> "rain-3"
+        else -> "rain-4"
+    }
+
+    /** Ikona sněhu podle srážek ve vodní hodnotě (počet vloček 1–3). */
+    private fun snowIcon(mm: Double) = when {
+        mm.isNaN() || mm < 1 -> "snow-1"
+        mm < 5 -> "snow-2"
+        else -> "snow-3"
+    }
+
+    private fun showersIcon(mm: Double) = if (mm.isNaN() || mm < 5) "showers-1" else "showers-2"
+
+    /** WMO kód počasí + srážky (mm/den) -> název ikony */
+    private fun wmoIcon(c: Int, mm: Double) = when (c) {
         0 -> "clear-day"
         1, 2 -> "partly-cloudy-day"
         3 -> "overcast"
         45, 48 -> "fog-day"
-        51, 53, 55 -> "drizzle"
-        56, 57, 66, 67 -> "sleet"
-        61, 63, 65 -> "rain"
-        71, 73, 75, 77 -> "snow"
-        80, 81, 82 -> "partly-cloudy-day-rain"
-        85, 86 -> "partly-cloudy-day-snow"
+        51, 53, 55, 61, 63, 65 -> rainIcon(mm)
+        56, 57, 66, 67 -> "sleet-2"
+        71, 73, 75, 77 -> snowIcon(mm)
+        80, 81, 82 -> showersIcon(mm)
+        85, 86 -> "snow-showers"
         95 -> "thunderstorms-day-rain"
         96, 99 -> "thunderstorms-rain"
         else -> "not-available"
@@ -150,13 +166,14 @@ object ForecastClient {
                     f?.optJSONObject("precipitation")?.optJSONObject("qpf")?.optDouble("quantity", 0.0) ?: 0.0
                 fun prob(f: JSONObject?) =
                     f?.optJSONObject("precipitation")?.optJSONObject("probability")?.optInt("percent", -1) ?: -1
+                val mm = qpf(dayF) + qpf(nightF)
                 result.add(
                     ForecastDay(
                         date = date,
-                        icon = googleIcon(type),
+                        icon = googleIcon(type, mm),
                         tMax = d.optJSONObject("maxTemperature")?.optDouble("degrees", Double.NaN) ?: Double.NaN,
                         tMin = d.optJSONObject("minTemperature")?.optDouble("degrees", Double.NaN) ?: Double.NaN,
-                        precipMm = qpf(dayF) + qpf(nightF),
+                        precipMm = mm,
                         precipProb = maxOf(prob(dayF), prob(nightF)),
                     )
                 )
@@ -166,17 +183,15 @@ object ForecastClient {
         return result.take(10)
     }
 
-    /** Typ počasí z Google -> název ikony Meteocons */
-    private fun googleIcon(t: String): String = when {
+    /** Typ počasí z Google + srážky (mm/den) -> název ikony */
+    private fun googleIcon(t: String, mm: Double): String = when {
         t.contains("THUNDER") -> if (t.startsWith("SCATTERED") || t.startsWith("LIGHT")) "thunderstorms-day-rain" else "thunderstorms-rain"
         t.contains("HAIL") -> "hail"
-        t == "RAIN_AND_SNOW" -> "sleet"
-        t.contains("SNOW") && (t.contains("SHOWERS")) -> "partly-cloudy-day-snow"
-        t.contains("SNOW") -> "snow"
-        t == "WIND_AND_RAIN" -> "rain"
-        t.contains("SHOWERS") -> "partly-cloudy-day-rain"
-        t == "LIGHT_RAIN" -> "drizzle"
-        t.contains("RAIN") -> "rain"
+        t == "RAIN_AND_SNOW" -> "sleet-2"
+        t.contains("SNOW") && t.contains("SHOWERS") -> "snow-showers"
+        t.contains("SNOW") -> snowIcon(mm)
+        t.contains("SHOWERS") -> showersIcon(mm)
+        t.contains("RAIN") -> rainIcon(mm)
         t == "PARTLY_CLOUDY" || t == "MOSTLY_CLEAR" -> "partly-cloudy-day"
         t == "MOSTLY_CLOUDY" -> "overcast-day"
         t == "CLOUDY" -> "overcast"

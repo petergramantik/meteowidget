@@ -118,25 +118,47 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
     }
 
     // ---------- aktuální hodnoty ----------
+    // rozbalený graf čidla z prvního panelu
+    private var openChannel: Channel? = null
+    private var openDays = 1
+
+    private fun toggleChannel(ch: Channel) {
+        openChannel = if (openChannel == ch) null else ch
+        refresh()
+    }
+
     private fun current(p: Prefs, w: Weather) {
         val big = a.card()
         val row = a.hbox(Gravity.TOP)
-        fun col(name: String, temp: Double?, hum: Int?, color: Int, gravity: Int): LinearLayout = a.vbox(gravity).apply {
-            addView(a.label(name), a.lp(WRAP, WRAP))
+        val selBg = { rounded(C.CARD2, a.dp(12).toFloat(), a.dp(1), 0x88FFD54F.toInt()) }
+        fun col(ch: Channel, temp: Double?, hum: Int?, color: Int, gravity: Int): LinearLayout = a.vbox(gravity).apply {
+            addView(a.label(p.channelName(ch) + if (openChannel == ch) "  ▾" else ""), a.lp(WRAP, WRAP))
             addView(a.text(t(temp), 46f, color, condensed = true), a.lp(WRAP, WRAP, top = 4))
             addView(a.text(Weather.h(hum), 22f, color, condensed = true), a.lp(WRAP, WRAP, top = 2))
+            setPadding(a.dp(6), a.dp(4), a.dp(6), a.dp(6))
+            if (openChannel == ch) background = selBg()
+            setOnClickListener { toggleChannel(ch) }
         }
-        row.addView(col(p.channelName(Channel.IN), w.tempIn, w.humIn, C.IN, Gravity.START), a.lp(0, WRAP, 1f))
-        row.addView(col(p.channelName(Channel.OUT), w.tempOut, w.humOut, C.OUT, Gravity.END), a.lp(0, WRAP, 1f))
+        row.addView(col(Channel.IN, w.tempIn, w.humIn, C.IN, Gravity.START), a.lp(0, WRAP, 1f, end = 4))
+        row.addView(col(Channel.OUT, w.tempOut, w.humOut, C.OUT, Gravity.END), a.lp(0, WRAP, 1f, start = 4))
         big.addView(row)
         val sensors = listOf(Channel.S1, Channel.S2, Channel.S3).mapNotNull { ch ->
-            w.temp(ch.tempCode)?.let { "${p.channelName(ch)}  ${t(it)} · ${Weather.h(w.hum(ch.humCode))}" }
+            w.temp(ch.tempCode)?.let { ch to "${p.channelName(ch)}  ${t(it)} · ${Weather.h(w.hum(ch.humCode))}" }
         }
         if (sensors.isNotEmpty()) {
-            big.addView(a.divider(), a.lp(h = a.dp(1), top = 10, bottom = 8))
-            sensors.forEach { big.addView(a.text(it, 16f, C.SENSOR, condensed = true), a.lp(bottom = 2)) }
+            big.addView(a.divider(), a.lp(h = a.dp(1), top = 10, bottom = 6))
+            sensors.forEach { (ch, txt) ->
+                val r = a.text(txt + if (openChannel == ch) "  ▾" else "", 16f, C.SENSOR, condensed = true).apply {
+                    setPadding(a.dp(6), a.dp(6), a.dp(6), a.dp(6))
+                    if (openChannel == ch) background = selBg()
+                    setOnClickListener { toggleChannel(ch) }
+                }
+                big.addView(r, a.lp(bottom = 2))
+            }
         }
+        big.addView(a.text("Klepni na čidlo pro graf", 11f, C.DIM), a.lp(top = 6))
         content.addView(big, a.lp(bottom = 10))
+        openChannel?.let { channelCharts(p, it) }
         humidityChart(p)
 
         val trend = PressureHistory.trend3h(a)
@@ -155,6 +177,53 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             humTile(w),
         )
         content.addView(a.grid(tiles), a.lp(bottom = 2))
+    }
+
+    /** Graf teploty a vlhkosti vybraného čidla (rozbalený pod prvním panelem). */
+    private fun channelCharts(p: Prefs, ch: Channel) {
+        val (tc, hc) = when (ch) {
+            Channel.IN -> "tin" to "hin"
+            Channel.OUT -> "tout" to "hout"
+            Channel.S1 -> "t1" to "h1"
+            Channel.S2 -> "t2" to "h2"
+            Channel.S3 -> "t3" to "h3"
+        }
+        val color = when (ch) { Channel.IN -> C.IN; Channel.OUT -> C.OUT; else -> C.SENSOR }
+        val now = System.currentTimeMillis()
+        val samples = MeteoDb.get(a).range(now - openDays * 24 * 3_600_000L, now)
+        fun ser(col: String, name: String, c: Int, unit: String): List<Series> {
+            val list = samples.filter { it.get(col) != null }
+            if (list.isEmpty()) return emptyList()
+            return listOf(Series(name, c, list.map { it.t }.toLongArray(), list.map { it.get(col)!! }.toDoubleArray(), unit = unit))
+        }
+        val card = a.card(p.channelName(ch) + " – " + if (openDays == 1) "24 h" else "7 dní", color)
+        val charts = ArrayList<ChartView>()
+        val n = NotifyPrefs(a)
+        for ((series, title) in listOf(ser(tc, "Teplota", color, "°C") to "Teplota", ser(hc, "Vlhkost", 0xFF8FD3FF.toInt(), "%") to "Vlhkost")) {
+            val chart = ChartView(a).apply {
+                this.series = series
+                this.title = title
+                if (title == "Vlhkost" && ch == Channel.IN && n.hum) band = n.humMin.toDouble() to n.humMax.toDouble()
+                onCursor = { tm -> charts.forEach { o -> if (o !== this) o.cursorTime = tm } }
+            }
+            charts.add(chart)
+            card.addView(chart, a.lp(h = a.dp(160), bottom = 4))
+            series.firstOrNull()?.let { sr ->
+                val v = sr.values.filter { !it.isNaN() }
+                if (v.isNotEmpty()) card.addView(
+                    a.text("min ${f1(v.min())}  ø ${f1(v.average())}  max ${f1(v.max())} ${sr.unit}", 12f, C.LABEL, condensed = true),
+                    a.lp(bottom = 6)
+                )
+            }
+        }
+        if (samples.isEmpty()) card.addView(a.text("Zatím žádná data.", 13f, C.DIM))
+        val chips = a.chipRow(
+            a.chip("24 h", openDays == 1) { openDays = 1; refresh() },
+            a.chip("7 dní", openDays == 7) { openDays = 7; refresh() },
+            a.chip("✕ Zavřít", false) { openChannel = null; refresh() },
+        )
+        card.addView(chips, a.lp(top = 4))
+        content.addView(card, a.lp(bottom = 10))
     }
 
     /** Graf vlhkosti za 24 h přes celou šířku, s vyznačeným doporučeným pásmem. */

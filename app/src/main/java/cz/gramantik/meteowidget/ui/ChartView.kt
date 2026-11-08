@@ -81,19 +81,41 @@ class ChartView(ctx: Context) : View(ctx) {
         setMeasuredDimension(w, resolveSize((210 * d).toInt(), heightMeasureSpec))
     }
 
+    // směr gesta: 0 = zatím neurčen, 1 = vodorovně (kurzor), 2 = svisle (posun stránky)
+    private var downX = 0f
+    private var downY = 0f
+    private var gesture = 0
+    private val slop = android.view.ViewConfiguration.get(ctx).scaledTouchSlop
+
+    private fun cursorAt(x: Float) {
+        if (gRight <= gLeft) return
+        val t = gT0 + ((x.coerceIn(gLeft, gRight) - gLeft) / (gRight - gLeft) * (gT1 - gT0)).toLong()
+        cursorTime = t
+        onCursor?.invoke(t)
+    }
+
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                parent?.requestDisallowInterceptTouchEvent(true)
-                if (gRight > gLeft) {
-                    val t = gT0 + ((e.x.coerceIn(gLeft, gRight) - gLeft) / (gRight - gLeft) * (gT1 - gT0)).toLong()
-                    cursorTime = t
-                    onCursor?.invoke(t)
-                }
+            MotionEvent.ACTION_DOWN -> {
+                downX = e.x; downY = e.y; gesture = 0
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_MOVE -> {
+                if (gesture == 0) {
+                    val dx = abs(e.x - downX)
+                    val dy = abs(e.y - downY)
+                    if (dx > slop || dy > slop) {
+                        gesture = if (dx > dy) 1 else 2
+                        if (gesture == 1) parent?.requestDisallowInterceptTouchEvent(true)
+                        else return false // svislý pohyb nechat stránce
+                    }
+                }
+                if (gesture == 1) cursorAt(e.x)
+            }
+            MotionEvent.ACTION_UP -> {
+                if (gesture == 0) cursorAt(e.x) // krátké klepnutí
                 parent?.requestDisallowInterceptTouchEvent(false)
             }
+            MotionEvent.ACTION_CANCEL -> parent?.requestDisallowInterceptTouchEvent(false)
         }
         return true
     }

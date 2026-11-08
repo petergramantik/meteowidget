@@ -126,8 +126,10 @@ class SettingsActivity : Activity() {
         bindCheck(R.id.n_hum, np.hum) { np.hum = it }
         bindNum(R.id.n_hum_min, np.humMin) { np.humMin = it }
         bindNum(R.id.n_hum_max, np.humMax) { np.humMax = it }
-        listOf(R.id.hum_chart_1, R.id.hum_chart_2, R.id.hum_chart_3).forEachIndexed { i, id ->
-            bindCheck(id, np.humChart(i + 1)) { np.setHumChart(i + 1, it) }
+        bindNum(R.id.comf_t_min, np.tempMin) { np.tempMin = it }
+        bindNum(R.id.comf_t_max, np.tempMax) { np.tempMax = it }
+        listOf(R.id.indoor_1, R.id.indoor_2, R.id.indoor_3).forEachIndexed { i, id ->
+            bindCheck(id, np.indoor(i + 1)) { np.setIndoor(i + 1, it) }
         }
 
         // ---------- radar ----------

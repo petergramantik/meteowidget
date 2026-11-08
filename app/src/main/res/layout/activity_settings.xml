@@ -73,12 +73,15 @@
 
         <TextView style="@style/Label" android:text="Čidlo 1" />
         <EditText android:id="@+id/name_s1" style="@style/Field" android:inputType="text" />
+        <CheckBox android:id="@+id/indoor_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vnitřní čidlo (zobrazit komfortní zónu)" />
 
         <TextView style="@style/Label" android:text="Čidlo 2" />
         <EditText android:id="@+id/name_s2" style="@style/Field" android:inputType="text" />
+        <CheckBox android:id="@+id/indoor_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vnitřní čidlo (zobrazit komfortní zónu)" />
 
         <TextView style="@style/Label" android:text="Čidlo 3" />
         <EditText android:id="@+id/name_s3" style="@style/Field" android:inputType="text" />
+        <CheckBox android:id="@+id/indoor_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vnitřní čidlo (zobrazit komfortní zónu)" />
 
         <TextView style="@style/Section" android:text="Předpověď na 10 dní" />
 
@@ -123,7 +126,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <TextView style="@style/Section" android:text="Vlhkost doma" />
+        <TextView style="@style/Section" android:text="Komfortní zóna (doma a vnitřní čidla)" />
 
         <CheckBox android:id="@+id/n_hum" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hlídat vlhkost doma (upozornění + pásmo v grafu)" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
@@ -136,10 +139,17 @@
                 <EditText android:id="@+id/n_hum_max" style="@style/Field" android:inputType="number" />
             </LinearLayout>
         </LinearLayout>
-        <TextView style="@style/Label" android:text="Další čidla v grafu vlhkosti (Doma a Venku jsou vždy)" />
-        <CheckBox android:id="@+id/hum_chart_1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Čidlo 1" />
-        <CheckBox android:id="@+id/hum_chart_2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Čidlo 2" />
-        <CheckBox android:id="@+id/hum_chart_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Čidlo 3" />
+        <TextView style="@style/Label" android:layout_marginTop="10dp" android:text="Komfortní zóna teploty doma (°C)" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                <TextView style="@style/Label" android:text="Minimum (°C)" />
+                <EditText android:id="@+id/comf_t_min" style="@style/Field" android:inputType="numberDecimal|numberSigned" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
+                <TextView style="@style/Label" android:text="Maximum (°C)" />
+                <EditText android:id="@+id/comf_t_max" style="@style/Field" android:inputType="numberDecimal|numberSigned" />
+            </LinearLayout>
+        </LinearLayout>
 
         <TextView style="@style/Section" android:text="Upozornění" />
 

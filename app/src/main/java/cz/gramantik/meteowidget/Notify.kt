@@ -34,7 +34,15 @@ class NotifyPrefs(ctx: Context) {
     var humMin: Float get() = f("nHumMin", 40f); set(v) = setF("nHumMin", v)
     var humMax: Float get() = f("nHumMax", 60f); set(v) = setF("nHumMax", v)
 
-    /** Která čidla zobrazit v grafu vlhkosti na obrazovce Stanice (1–3). */
+    // komfortní zóna teploty (vnitřní)
+    var tempMin: Float get() = f("comfTMin", 20f); set(v) = setF("comfTMin", v)
+    var tempMax: Float get() = f("comfTMax", 24f); set(v) = setF("comfTMax", v)
+
+    /** Je čidlo 1–3 vnitřní? (výchozí ano) */
+    fun indoor(i: Int): Boolean = b("indoor$i", true)
+    fun setIndoor(i: Int, v: Boolean) = setB("indoor$i", v)
+
+    /** Která čidla zobrazit v panelu 24 h na obrazovce Stanice (1–3). */
     fun humChart(i: Int): Boolean = b("humChart$i", false)
     fun setHumChart(i: Int, v: Boolean) = setB("humChart$i", v)
 }

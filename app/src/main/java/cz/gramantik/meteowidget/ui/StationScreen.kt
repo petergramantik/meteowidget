@@ -203,7 +203,15 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             val chart = ChartView(a).apply {
                 this.series = series
                 this.title = title
-                if (title == "Vlhkost" && ch == Channel.IN && n.hum) band = n.humMin.toDouble() to n.humMax.toDouble()
+                val indoor = when (ch) {
+                    Channel.IN -> true
+                    Channel.OUT -> false
+                    Channel.S1 -> n.indoor(1)
+                    Channel.S2 -> n.indoor(2)
+                    Channel.S3 -> n.indoor(3)
+                }
+                if (indoor) band = if (title == "Vlhkost") n.humMin.toDouble() to n.humMax.toDouble()
+                    else n.tempMin.toDouble() to n.tempMax.toDouble()
                 onCursor = { tm -> charts.forEach { o -> if (o !== this) o.cursorTime = tm } }
             }
             charts.add(chart)
@@ -226,35 +234,54 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         content.addView(card, a.lp(bottom = 10))
     }
 
-    /** Graf vlhkosti za 24 h přes celou šířku, s vyznačeným doporučeným pásmem. */
+    /** Panel 24 h: přepínatelná vlhkost / teplota, Doma + Venku + volitelná čidla, komfortní zóna. */
     private fun humidityChart(p: Prefs) {
         val n = NotifyPrefs(a)
+        val sp = a.getSharedPreferences("meteo", android.content.Context.MODE_PRIVATE)
+        val temp = sp.getString("panel24Metric", "hum") == "temp"
         val now = System.currentTimeMillis()
         val samples = MeteoDb.get(a).range(now - 24 * 3_600_000L, now)
+        val unit = if (temp) "°C" else "%"
         fun s(col: String, name: String, color: Int): Series? {
             val list = samples.filter { it.get(col) != null }
             if (list.isEmpty()) return null
-            return Series(name, color, list.map { it.t }.toLongArray(), list.map { it.get(col)!! }.toDoubleArray(), unit = "%")
+            return Series(name, color, list.map { it.t }.toLongArray(), list.map { it.get(col)!! }.toDoubleArray(), unit = unit)
         }
+        val sensorColors = listOf(C.SENSOR, 0xFF9FA8DA.toInt(), 0xFFCE93D8.toInt())
+        val sensorCh = listOf(Channel.S1, Channel.S2, Channel.S3)
+        // čidla, která mají data
+        val available = (1..3).filter { i -> samples.any { it.get((if (temp) "t" else "h") + i) != null } }
         val series = listOfNotNull(
-            s("hin", p.channelName(Channel.IN), C.IN),
-            s("hout", p.channelName(Channel.OUT), C.OUT),
-            if (n.humChart(1)) s("h1", p.channelName(Channel.S1), C.SENSOR) else null,
-            if (n.humChart(2)) s("h2", p.channelName(Channel.S2), 0xFF9FA8DA.toInt()) else null,
-            if (n.humChart(3)) s("h3", p.channelName(Channel.S3), 0xFFCE93D8.toInt()) else null,
+            s(if (temp) "tin" else "hin", p.channelName(Channel.IN), C.IN),
+            s(if (temp) "tout" else "hout", p.channelName(Channel.OUT), C.OUT),
+        ) + available.filter { n.humChart(it) }.mapNotNull { i ->
+            s((if (temp) "t" else "h") + i, p.channelName(sensorCh[i - 1]), sensorColors[i - 1])
+        }
+
+        val c = a.card((if (temp) "Teplota" else "Vlhkost") + " – 24 h")
+        val chips = mutableListOf(
+            a.chip("Vlhkost", !temp) { sp.edit().putString("panel24Metric", "hum").apply(); refresh() },
+            a.chip("Teplota", temp) { sp.edit().putString("panel24Metric", "temp").apply(); refresh() },
         )
-        val c = a.card("Vlhkost – 24 h")
+        available.forEach { i ->
+            chips.add(a.chip("+ " + p.channelName(sensorCh[i - 1]), n.humChart(i)) { n.setHumChart(i, !n.humChart(i)); refresh() })
+        }
+        c.addView(a.chipRow(*chips.toTypedArray()), a.lp(bottom = 8))
+        val zone = if (temp) n.tempMin.toDouble() to n.tempMax.toDouble()
+            else if (n.hum) n.humMin.toDouble() to n.humMax.toDouble() else null
         c.addView(ChartView(a).apply {
             this.series = series
-            if (n.hum) band = n.humMin.toDouble() to n.humMax.toDouble()
+            band = zone
         }, a.lp(h = a.dp(190)))
         val legend = a.hbox()
         series.forEach { legend.addView(a.text("● ${it.name}  ", 12f, it.color)) }
-        if (n.hum) {
-            legend.addView(a.text("▮ ", 14f, BAND_SWATCH, bold = true))
-            legend.addView(a.text("Komfortní zóna: ${n.humMin.toInt()}–${n.humMax.toInt()} %", 12f, BAND_TEXT))
-        }
         c.addView(legend, a.lp(top = 4))
+        if (zone != null) {
+            val z = a.hbox()
+            z.addView(a.text("▮ ", 14f, BAND_SWATCH, bold = true))
+            z.addView(a.text("Komfortní zóna: ${zone.first.toInt()}–${zone.second.toInt()} $unit", 12f, BAND_TEXT))
+            c.addView(z, a.lp(top = 2))
+        }
         content.addView(c, a.lp(bottom = 10))
     }
 

@@ -63,10 +63,16 @@ class MainActivity : Activity() {
             setPadding(dp(8), dp(6), dp(8), dp(8))
             setBackgroundColor(0xFF0B0D10.toInt())
         }
-        listOf("📟  Stanice", "📅  Předpověď", "🛰  Radar").forEachIndexed { i, s ->
+        listOf(
+            "Stanice" to R.drawable.ic_tab_station,
+            "Předpověď" to R.drawable.ic_tab_forecast,
+            "Radar" to R.drawable.ic_tab_radar,
+        ).forEachIndexed { i, (s, icon) ->
             val t = text(s, 14f, C.DIM, bold = true).apply {
                 gravity = Gravity.CENTER
-                setPadding(dp(6), dp(10), dp(6), dp(10))
+                setPadding(dp(10), dp(10), dp(12), dp(10))
+                setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
+                compoundDrawablePadding = dp(6)
                 setOnClickListener { show(i) }
             }
             tabs.add(t)
@@ -97,7 +103,9 @@ class MainActivity : Activity() {
     private fun show(i: Int) {
         current = i
         tabs.forEachIndexed { j, t ->
-            t.setTextColor(if (j == i) C.BG else C.DIM)
+            val col = if (j == i) C.BG else C.DIM
+            t.setTextColor(col)
+            t.compoundDrawableTintList = android.content.res.ColorStateList.valueOf(col)
             t.background = if (j == i) rounded(C.ACCENT, dp(18).toFloat()) else null
         }
         val s = screens[i] ?: when (i) {

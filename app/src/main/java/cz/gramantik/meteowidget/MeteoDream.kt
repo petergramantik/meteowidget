@@ -27,7 +27,7 @@ class MeteoDream : DreamService() {
     }
 
     override fun onDetachedFromWindow() {
-        panel?.stop()
+        panel?.release()
         panel = null
         super.onDetachedFromWindow()
     }

@@ -210,7 +210,14 @@ object WidgetRenderer {
         for (d in days.take(10)) {
             val c = RemoteViews(ctx.packageName, R.layout.forecast_cell)
             c.setTextViewText(R.id.fc_day, dayName(d.date, today))
-            c.setTextViewText(R.id.fc_icon, d.icon)
+            val res = iconRes(ctx, d.icon)
+            if (res != 0) {
+                c.setImageViewResource(R.id.fc_img, res)
+            } else {
+                c.setViewVisibility(R.id.fc_img, View.GONE)
+                c.setViewVisibility(R.id.fc_icon, View.VISIBLE)
+                c.setTextViewText(R.id.fc_icon, d.icon)
+            }
             c.setTextViewText(R.id.fc_max, deg(d.tMax))
             c.setTextViewText(R.id.fc_min, deg(d.tMin))
             c.setTextViewText(
@@ -221,6 +228,11 @@ object WidgetRenderer {
         }
         return v
     }
+
+    /** Název ikony Meteocons -> drawable (0 = neexistuje). */
+    @android.annotation.SuppressLint("DiscouragedApi")
+    fun iconRes(ctx: Context, key: String): Int =
+        ctx.resources.getIdentifier("mc_" + key.replace('-', '_'), "drawable", ctx.packageName)
 
     private fun deg(v: Double) = if (v.isNaN()) "--" else "${v.roundToInt()}°"
 

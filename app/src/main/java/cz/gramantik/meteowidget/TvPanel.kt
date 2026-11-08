@@ -4,8 +4,12 @@ import android.content.Context
 import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
+import android.annotation.SuppressLint
 import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebView
 import android.widget.FrameLayout
+import android.widget.ImageView
 import java.util.Calendar
 import kotlin.random.Random
 
@@ -30,6 +34,11 @@ class TvPrefs(ctx: Context) {
     var nightTo: Int
         get() = sp.getInt("tvNightTo", 6)
         set(v) = sp.edit().putInt("tvNightTo", v.coerceIn(0, 23)).apply()
+
+    /** animované ikony předpovědi (v noci se vždy vypnou) */
+    var animatedIcons: Boolean
+        get() = sp.getBoolean("tvAnimIcons", true)
+        set(v) = sp.edit().putBoolean("tvAnimIcons", v).apply()
 
     var nightEnabled: Boolean
         get() = sp.getBoolean("tvNightOn", true)
@@ -91,6 +100,60 @@ class TvPanel(private val ctx: Context) {
         handler.removeCallbacks(tick)
     }
 
+    /** Uvolní animované ikony (volat při zavření obrazovky). */
+    fun release() {
+        stop()
+        webViews.values.forEach { (it.parent as? ViewGroup)?.removeView(it); it.destroy() }
+        webViews.clear()
+    }
+
+    // ---------- animované ikony (SVG Meteocons ve WebView) ----------
+    private val webViews = HashMap<Int, WebView>()
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun webViewFor(i: Int, key: String): WebView {
+        val wv = webViews.getOrPut(i) {
+            WebView(ctx).apply {
+                setBackgroundColor(Color.TRANSPARENT)
+                isFocusable = false
+                isFocusableInTouchMode = false
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+                settings.javaScriptEnabled = false
+            }
+        }
+        if (wv.tag != key) {
+            wv.tag = key
+            val html = "<html><body style='margin:0;background:transparent'>" +
+                "<img src='file:///android_asset/meteocons/$key.svg' style='width:100%;height:100%'>" +
+                "</body></html>"
+            wv.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "utf-8", null)
+        }
+        return wv
+    }
+
+    /** Nahradí statické ikony v řádku předpovědi animovanými. */
+    private fun animateIcons(view: View) {
+        if (!tv.animatedIcons || tv.isNight()) {
+            webViews.values.forEach { (it.parent as? ViewGroup)?.removeView(it) }
+            return
+        }
+        val row = view.findViewById<ViewGroup>(R.id.forecast_row) ?: return
+        val days = Prefs(ctx).forecast.take(10)
+        for (i in 0 until minOf(row.childCount, days.size)) {
+            val key = days[i].icon
+            if (WidgetRenderer.iconRes(ctx, key) == 0) continue
+            val img = row.getChildAt(i).findViewById<ImageView>(R.id.fc_img) ?: continue
+            val parent = img.parent as ViewGroup
+            val index = parent.indexOfChild(img)
+            val lp = img.layoutParams
+            val wv = webViewFor(i, key)
+            (wv.parent as? ViewGroup)?.removeView(wv)
+            parent.removeView(img)
+            parent.addView(wv, index, lp)
+        }
+    }
+
     /** Stáhne nová data, pokud jsou starší než 5 min. */
     private fun maybeSync(force: Boolean = false) {
         val p = Prefs(ctx)
@@ -116,6 +179,7 @@ class TvPanel(private val ctx: Context) {
         view.isClickable = false
         content.removeAllViews()
         content.addView(view)
+        animateIcons(view)
         // posun obsahu o pár dp každých 10 minut
         val now = System.currentTimeMillis()
         if (now - lastShift > 10 * 60_000) {

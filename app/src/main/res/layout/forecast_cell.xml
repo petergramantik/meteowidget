@@ -14,12 +14,21 @@
         android:textColor="#CCFFFFFF"
         android:textSize="11sp" />
 
+    <!-- ikona Meteocons (na TV se nahradí animovanou) -->
+    <ImageView
+        android:id="@+id/fc_img"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:scaleType="fitCenter" />
+
+    <!-- záložní emoji pro starší uloženou předpověď -->
     <TextView
         android:id="@+id/fc_icon"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:textSize="17sp" />
+        android:textSize="17sp"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/fc_max"

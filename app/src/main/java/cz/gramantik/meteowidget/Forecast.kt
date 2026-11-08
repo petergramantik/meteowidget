@@ -106,17 +106,21 @@ object ForecastClient {
         }
     }
 
+    /** WMO kód počasí -> název ikony Meteocons */
     private fun wmoIcon(c: Int) = when (c) {
-        0 -> "☀️"
-        1 -> "🌤️"
-        2 -> "⛅"
-        3 -> "☁️"
-        45, 48 -> "🌫️"
-        51, 53, 55, 56, 57 -> "🌦️"
-        61, 63, 65, 66, 67, 80, 81, 82 -> "🌧️"
-        71, 73, 75, 77, 85, 86 -> "🌨️"
-        95, 96, 99 -> "⛈️"
-        else -> "·"
+        0 -> "clear-day"
+        1, 2 -> "partly-cloudy-day"
+        3 -> "overcast"
+        45, 48 -> "fog-day"
+        51, 53, 55 -> "drizzle"
+        56, 57, 66, 67 -> "sleet"
+        61, 63, 65 -> "rain"
+        71, 73, 75, 77 -> "snow"
+        80, 81, 82 -> "partly-cloudy-day-rain"
+        85, 86 -> "partly-cloudy-day-snow"
+        95 -> "thunderstorms-day-rain"
+        96, 99 -> "thunderstorms-rain"
+        else -> "not-available"
     }
 
     // ---------- Google Weather API ----------
@@ -162,16 +166,23 @@ object ForecastClient {
         return result.take(10)
     }
 
+    /** Typ počasí z Google -> název ikony Meteocons */
     private fun googleIcon(t: String): String = when {
-        t.contains("THUNDER") -> "⛈️"
-        t.contains("SNOW") || t.contains("HAIL") -> "🌨️"
-        t.contains("RAIN") || t.contains("SHOWER") -> "🌧️"
-        t == "PARTLY_CLOUDY" -> "⛅"
-        t == "MOSTLY_CLOUDY" || t == "CLOUDY" -> "☁️"
-        t == "MOSTLY_CLEAR" -> "🌤️"
-        t == "CLEAR" -> "☀️"
-        t.contains("WIND") -> "💨"
-        t.contains("FOG") || t.contains("HAZE") -> "🌫️"
-        else -> "·"
+        t.contains("THUNDER") -> if (t.startsWith("SCATTERED") || t.startsWith("LIGHT")) "thunderstorms-day-rain" else "thunderstorms-rain"
+        t.contains("HAIL") -> "hail"
+        t == "RAIN_AND_SNOW" -> "sleet"
+        t.contains("SNOW") && (t.contains("SHOWERS")) -> "partly-cloudy-day-snow"
+        t.contains("SNOW") -> "snow"
+        t == "WIND_AND_RAIN" -> "rain"
+        t.contains("SHOWERS") -> "partly-cloudy-day-rain"
+        t == "LIGHT_RAIN" -> "drizzle"
+        t.contains("RAIN") -> "rain"
+        t == "PARTLY_CLOUDY" || t == "MOSTLY_CLEAR" -> "partly-cloudy-day"
+        t == "MOSTLY_CLOUDY" -> "overcast-day"
+        t == "CLOUDY" -> "overcast"
+        t == "CLEAR" -> "clear-day"
+        t.contains("WIND") -> "wind"
+        t.contains("FOG") || t.contains("HAZE") -> "fog-day"
+        else -> "not-available"
     }
 }

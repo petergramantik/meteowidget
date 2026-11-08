@@ -119,6 +119,9 @@ class SettingsActivity : Activity() {
         day.keyProgressIncrement = 5
         night.keyProgressIncrement = 1
         nightOn.setOnCheckedChangeListener { _, on -> tv.nightEnabled = on }
+        val animIcons = findViewById<CheckBox>(R.id.tv_anim_icons)
+        animIcons.isChecked = tv.animatedIcons
+        animIcons.setOnCheckedChangeListener { _, on -> tv.animatedIcons = on }
         val hourWatcher = { e: EditText, set: (Int) -> Unit ->
             e.setOnFocusChangeListener { _, has ->
                 if (!has) e.text.toString().toIntOrNull()?.let { set(it) }

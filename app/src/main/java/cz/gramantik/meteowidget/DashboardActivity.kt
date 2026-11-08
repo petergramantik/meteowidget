@@ -42,6 +42,11 @@ class DashboardActivity : Activity() {
         super.onPause()
     }
 
+    override fun onDestroy() {
+        panel.release()
+        super.onDestroy()
+    }
+
     private fun show(msg: String) {
         toast?.cancel()
         toast = Toast.makeText(this, msg, Toast.LENGTH_SHORT).also { it.show() }

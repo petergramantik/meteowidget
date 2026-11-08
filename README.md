@@ -14,3 +14,7 @@ Poslední APK je v [Releases](../../releases/latest). Každý push do `main` ses
 V aplikaci zadej Access ID, Access Secret a Device ID z [iot.tuya.com](https://iot.tuya.com)
 (Cloud projekt, datové centrum Central Europe, propojený účet aplikace Tuya).
 Klíče se ukládají jen v telefonu, v repozitáři nejsou.
+
+## Licence ikon
+Ikony počasí: [Meteocons](https://github.com/basmilius/weather-icons) od Bas Milius, licence MIT
+(viz `app/src/main/assets/meteocons/LICENSE`).

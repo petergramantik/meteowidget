@@ -35,6 +35,7 @@ class RadarScreen(private val a: Activity) : MainActivity.Screen {
     override val view: View = web
 
     private var loadedKey = ""
+    private fun key(p: Prefs) = p.owmKey + "|" + p.mapyKey + "|" + p.lat + "|" + p.lon
 
     init { load() }
 
@@ -46,14 +47,15 @@ class RadarScreen(private val a: Activity) : MainActivity.Screen {
             .replace("__LON__", String.format(Locale.US, "%.4f", p.lon))
             .replace("__NAME__", p.locName.replace("'", ""))
             .replace("__OWM__", p.owmKey.replace("'", ""))
-        loadedKey = p.owmKey + "|" + p.lat + "|" + p.lon
+            .replace("__MAPY__", p.mapyKey.replace("'", ""))
+        loadedKey = key(p)
         web.loadDataWithBaseURL("https://meteowidget.local/", html, "text/html", "utf-8", null)
     }
 
     override fun refresh() {
         val p = Prefs(a)
         // změna klíče nebo místa v nastavení -> načíst stránku znovu
-        if (p.owmKey + "|" + p.lat + "|" + p.lon != loadedKey) load()
+        if (key(p) != loadedKey) load()
         else web.evaluateJavascript("if (window.reloadFrames) reloadFrames();", null)
     }
 

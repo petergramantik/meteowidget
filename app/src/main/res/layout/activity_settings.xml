@@ -23,23 +23,46 @@
             android:layout_height="wrap_content"
             android:text="Zkontrolovat aktualizace" />
 
-        <TextView style="@style/Section" android:text="Stanice (Tuya Cloud)" />
+        <TextView style="@style/Section" android:text="Klíče a přístupy" />
 
+        <TextView style="@style/Label" android:textStyle="bold" android:textColor="#333333" android:text="Tuya Cloud – data ze stanice (povinné)" />
+        <TextView style="@style/Label" android:autoLink="web" android:text="Cloud projekt na iot.tuya.com → Overview (Access ID/Secret), Devices (Device ID): https://iot.tuya.com" />
         <TextView style="@style/Label" android:text="Access ID / Client ID" />
         <EditText android:id="@+id/access_id" style="@style/Field" android:inputType="text" />
-
         <TextView style="@style/Label" android:text="Access Secret / Client Secret" />
-        <EditText android:id="@+id/access_secret" style="@style/Field" android:inputType="textPassword" />
-
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <EditText android:id="@+id/access_secret" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:singleLine="true" android:hint="" android:inputType="textPassword" />
+            <TextView android:id="@+id/eye_secret" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="10dp" android:text="👁" android:textSize="18sp" />
+        </LinearLayout>
         <TextView style="@style/Label" android:text="Device ID stanice" />
         <EditText android:id="@+id/device_id" style="@style/Field" android:inputType="text" />
-
         <TextView style="@style/Label" android:text="Datové centrum" />
-        <Spinner
-            android:id="@+id/data_center"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+        <Spinner android:id="@+id/data_center" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <TextView android:id="@+id/st_tuya" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" />
 
+        <TextView style="@style/Label" android:layout_marginTop="16dp" android:textStyle="bold" android:textColor="#333333" android:text="Mapy.com – satelitní mapa na radaru" />
+        <TextView style="@style/Label" android:autoLink="web" android:text="Registrace a projekt s API klíčem: https://developer.mapy.com/account" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <EditText android:id="@+id/mapy_key" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:singleLine="true" android:hint="API klíč Mapy.com" android:inputType="textPassword" />
+            <TextView android:id="@+id/eye_mapy" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="10dp" android:text="👁" android:textSize="18sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/st_mapy" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" />
+
+        <TextView style="@style/Label" android:layout_marginTop="16dp" android:textStyle="bold" android:textColor="#333333" android:text="OpenWeatherMap – vrstvy oblačnost, teplota, vítr (nepovinné)" />
+        <TextView style="@style/Label" android:autoLink="web" android:text="Účet zdarma, klíč v sekci My API keys: https://home.openweathermap.org/api_keys" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <EditText android:id="@+id/owm_key" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:singleLine="true" android:hint="API klíč OpenWeatherMap" android:inputType="textPassword" />
+            <TextView android:id="@+id/eye_owm" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="10dp" android:text="👁" android:textSize="18sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/st_owm" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" />
+
+        <TextView style="@style/Label" android:layout_marginTop="16dp" android:textStyle="bold" android:textColor="#333333" android:text="Google Weather API – volitelný zdroj předpovědi pro widget" />
+        <TextView style="@style/Label" android:autoLink="web" android:text="Google Cloud projekt s Weather API: https://developers.google.com/maps/documentation/weather" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <EditText android:id="@+id/google_key" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:singleLine="true" android:hint="API klíč Google" android:inputType="textPassword" />
+            <TextView android:id="@+id/eye_google" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="10dp" android:text="👁" android:textSize="18sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/st_google" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" />
         <TextView style="@style/Section" android:text="Názvy kanálů" />
 
         <TextView style="@style/Label" android:text="Hlavní stanice (vnitřní)" />
@@ -65,11 +88,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
-        <TextView
-            android:id="@+id/google_key_label"
-            style="@style/Label"
-            android:text="Google Maps Platform API klíč (Weather API)" />
-        <EditText android:id="@+id/google_key" style="@style/Field" android:inputType="textPassword" />
 
         <TextView style="@style/Label" android:text="Místo" />
         <EditText android:id="@+id/loc_name" style="@style/Field" android:inputType="text" />
@@ -142,10 +160,6 @@
         <CheckBox android:id="@+id/n_alerts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Výstrahy ČHMÚ" />
         <TextView style="@style/Label" android:text="Oblast výstrah (název ORP nebo okresu, např. Kyjov)" />
         <EditText android:id="@+id/alert_region" style="@style/Field" android:inputType="text" />
-
-        <TextView style="@style/Section" android:text="Radar" />
-        <TextView style="@style/Label" android:text="OpenWeatherMap API klíč (nepovinné – vrstvy oblačnost, teplota, vítr)" />
-        <EditText android:id="@+id/owm_key" style="@style/Field" android:inputType="textPassword" />
 
         <TextView style="@style/Section" android:text="Historie" />
         <Button

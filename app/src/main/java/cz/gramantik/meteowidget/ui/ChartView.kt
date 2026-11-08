@@ -34,12 +34,28 @@ class Series(
  */
 class ChartView(ctx: Context) : View(ctx) {
     var series: List<Series> = emptyList()
-        set(v) { field = v; touchX = -1f; invalidate() }
+        set(v) { field = v; cursorTime = null; invalidate() }
+
+    /** Čas svislého kurzoru (sdílí se mezi grafy pod sebou). */
+    var cursorTime: Long? = null
+        set(v) { field = v; invalidate() }
+
+    /** Volá se při posunu prstu – ostatní grafy nastaví stejný čas. */
+    var onCursor: ((Long?) -> Unit)? = null
+
+    /** Nadpis v levém horním rohu grafu. */
+    var title: String? = null
+
+    // geometrie z posledního vykreslení (pro převod dotyku na čas)
+    private var gLeft = 0f
+    private var gRight = 0f
+    private var gT0 = 0L
+    private var gT1 = 1L
 
     /** Volitelné vodorovné pásmo (např. doporučená vlhkost 40–60 %). */
     var band: Pair<Double, Double>? = null
         set(v) { field = v; invalidate() }
-    private val bandPaint = Paint().apply { color = 0x1A3DDC97 }
+    private val bandPaint = Paint().apply { color = BAND_COLOR }
     private val dot = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val d = resources.displayMetrics.density
@@ -55,7 +71,6 @@ class ChartView(ctx: Context) : View(ctx) {
     private val cursor = Paint().apply { color = 0x88FFFFFF.toInt(); strokeWidth = 1f * d }
     private val tipBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xEE1B2027.toInt() }
     private val tipText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 12f * d; color = 0xFFFFFFFF.toInt() }
-    private var touchX = -1f
 
     init {
         minimumHeight = (200 * d).toInt()
@@ -70,7 +85,11 @@ class ChartView(ctx: Context) : View(ctx) {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
-                touchX = e.x; invalidate()
+                if (gRight > gLeft) {
+                    val t = gT0 + ((e.x.coerceIn(gLeft, gRight) - gLeft) / (gRight - gLeft) * (gT1 - gT0)).toLong()
+                    cursorTime = t
+                    onCursor?.invoke(t)
+                }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 parent?.requestDisallowInterceptTouchEvent(false)
@@ -115,6 +134,7 @@ class ChartView(ctx: Context) : View(ctx) {
         val t0 = all.minOf { it.times.first() }
         val t1 = all.maxOf { it.times.last() }.let { if (it == t0) t0 + 1 else it }
         fun x(t: Long) = left + (t - t0).toFloat() / (t1 - t0) * (right - left)
+        gLeft = left; gRight = right; gT0 = t0; gT1 = t1
         fun y(v: Double, r: Pair<Double, Double>) = (bottom - (v - r.first) / (r.second - r.first) * (bottom - top)).toFloat()
 
         band?.let { b -> c.drawRect(left, y(b.second, r1), right, y(b.first, r1), bandPaint) }
@@ -181,10 +201,14 @@ class ChartView(ctx: Context) : View(ctx) {
             }
         }
 
-        // dotyk – hodnoty v daném čase
-        if (touchX in left..right) {
+        title?.let { c.drawText(it, left + 4f * d, top + 10f * d, axisText) }
+
+        // kurzor – hodnoty v daném čase
+        val ct = cursorTime
+        val touchX = if (ct != null && ct in t0..t1) x(ct) else -1f
+        if (ct != null && touchX >= left) {
             c.drawLine(touchX, top, touchX, bottom, cursor)
-            val t = t0 + ((touchX - left) / (right - left) * span).toLong()
+            val t = ct
             val rows = ArrayList<Pair<String, Int>>()
             rows.add(SimpleDateFormat("EEE d.M. HH:mm", Locale("cs", "CZ")).format(Date(t)) to 0xFFFFFFFF.toInt())
             val near = max(20 * 60_000L, span / 40)
@@ -212,3 +236,10 @@ class ChartView(ctx: Context) : View(ctx) {
         if (abs(v) >= 100 || v == floor(v)) String.format(Locale("cs", "CZ"), "%.0f", v)
         else String.format(Locale("cs", "CZ"), "%.1f", v)
 }
+
+/** Barva pásma komfortní zóny (poloprůhledná zelená). */
+const val BAND_COLOR = 0x333DDC97
+/** Stejný odstín, jak vypadá pásmo na tmavé kartě (pro legendu). */
+const val BAND_SWATCH = 0xFF1F5543.toInt()
+/** Čitelná tmavší zelená pro text legendy. */
+const val BAND_TEXT = 0xFF2FA57A.toInt()

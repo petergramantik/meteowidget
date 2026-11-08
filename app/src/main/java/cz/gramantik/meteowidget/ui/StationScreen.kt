@@ -41,7 +41,17 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
     private enum class Period(val label: String) { H24("24 h"), D7("7 dní"), D30("30 dní"), DAY("Den…"), RANGE("Rozsah…") }
     private enum class Metric(val label: String) { TEMP("Teplota"), HUM("Vlhkost"), PRES("Tlak"), WIND("Vítr"), RAIN("Srážky"), UV("UV"), LIGHT("Světlo") }
     private var period = Period.H24
-    private var metric = Metric.TEMP
+    /** vybrané veličiny (vícenásobný výběr, pamatuje se) */
+    private val metrics: MutableSet<Metric> = run {
+        val saved = a.getSharedPreferences("meteo", android.content.Context.MODE_PRIVATE).getString("histMetrics", null)
+        val set = saved?.split(',')?.mapNotNull { n -> Metric.entries.firstOrNull { it.name == n } }?.toMutableSet()
+        if (set.isNullOrEmpty()) mutableSetOf(Metric.TEMP) else set
+    }
+
+    private fun saveMetrics() {
+        a.getSharedPreferences("meteo", android.content.Context.MODE_PRIVATE).edit()
+            .putString("histMetrics", metrics.joinToString(",") { it.name }).apply()
+    }
     private var dayFrom: LocalDate = LocalDate.now()
     private var dayTo: LocalDate = LocalDate.now()
     private var historyBox: LinearLayout? = null
@@ -142,9 +152,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             a.tile("Rosný bod", t(w.dewPoint), C.FEELS),
             a.tile("UV index", f1(w.uv), C.UV, uvText(w.uv)),
             a.tile("Světlo", "${f1(w.lightKlux)} klux", C.LIGHT),
-            a.tile("Abs. vlhkost venku",
-                if (w.tempOut != null && w.humOut != null) "${f1(Astro.absHumidity(w.tempOut!!, w.humOut!!.toDouble()))} g/m³" else "--",
-                C.OUT),
+            humTile(w),
         )
         content.addView(a.grid(tiles), a.lp(bottom = 2))
     }
@@ -173,9 +181,32 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         }, a.lp(h = a.dp(190)))
         val legend = a.hbox()
         series.forEach { legend.addView(a.text("● ${it.name}  ", 12f, it.color)) }
-        if (n.hum) legend.addView(a.text("▮ ${n.humMin.toInt()}–${n.humMax.toInt()} %", 12f, C.OUT))
+        if (n.hum) {
+            legend.addView(a.text("▮ ", 14f, BAND_SWATCH, bold = true))
+            legend.addView(a.text("Komfortní zóna: ${n.humMin.toInt()}–${n.humMax.toInt()} %", 12f, BAND_TEXT))
+        }
         c.addView(legend, a.lp(top = 4))
         content.addView(c, a.lp(bottom = 10))
+    }
+
+    /** Dlaždice vlhkosti venku – klepnutím přepíná % a g/m³. */
+    private fun humTile(w: Weather): View {
+        val sp = a.getSharedPreferences("meteo", android.content.Context.MODE_PRIVATE)
+        val abs = sp.getBoolean("outHumAbs", true)
+        val t = w.tempOut
+        val h = w.humOut
+        val tile = if (abs) {
+            a.tile("Abs. vlhkost venku",
+                if (t != null && h != null) "${f1(Astro.absHumidity(t, h.toDouble()))} g/m³" else "--",
+                C.OUT, "klepni pro %")
+        } else {
+            a.tile("Vlhkost venku", Weather.h(h), C.OUT, "klepni pro g/m³")
+        }
+        tile.setOnClickListener {
+            sp.edit().putBoolean("outHumAbs", !abs).apply()
+            refresh()
+        }
+        return tile
     }
 
     private fun uvText(uv: Double?): String? = uv?.let {
@@ -306,7 +337,14 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             }
         }
         c.addView(a.chipRow(*periodChips.toTypedArray()), a.lp(bottom = 6))
-        val metricChips = Metric.entries.map { m -> a.chip(m.label, m == metric) { metric = m; fillHistory() } }
+        val metricChips = Metric.entries.map { m ->
+            a.chip(m.label, m in metrics) {
+                // vícenásobný výběr; aspoň jedna veličina musí zůstat
+                if (m in metrics) { if (metrics.size > 1) metrics.remove(m) } else metrics.add(m)
+                saveMetrics()
+                fillHistory()
+            }
+        }
         c.addView(a.chipRow(*metricChips.toTypedArray()), a.lp(bottom = 8))
 
         val (from, to) = rangeMs()
@@ -324,7 +362,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             if (list.isEmpty()) return null
             return Series(name, color, list.map { it.t }.toLongArray(), list.map { it.get(col)!! }.toDoubleArray(), bars, unit, own)
         }
-        val series = when (metric) {
+        fun seriesFor(m: Metric): List<Series> = when (m) {
             Metric.TEMP -> listOfNotNull(
                 s("tout", p.channelName(Channel.OUT), C.OUT, "°C"), s("tin", p.channelName(Channel.IN), C.IN, "°C"),
                 s("t1", p.channelName(Channel.S1), C.SENSOR, "°C"), s("t2", p.channelName(Channel.S2), 0xFF9FA8DA.toInt(), "°C"),
@@ -340,19 +378,35 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             Metric.UV -> listOfNotNull(s("uv", "UV", C.UV, ""))
             Metric.LIGHT -> listOfNotNull(s("light", "Světlo", C.LIGHT, "klux"))
         }
-        val chart = ChartView(a).apply { this.series = series }
-        c.addView(chart, a.lp(h = a.dp(220)))
 
-        // legenda + statistika
-        for (sr in series) {
-            val v = sr.values.filter { !it.isNaN() }
-            if (v.isEmpty()) continue
-            val r = a.hbox()
-            r.addView(a.text("● ${sr.name}", 13f, sr.color), a.lp(0, WRAP, 1f))
-            r.addView(a.text("min ${f1(v.min())}  ø ${f1(v.average())}  max ${f1(v.max())} ${sr.unit}", 12f, C.LABEL, condensed = true))
-            c.addView(r, a.lp(top = 4))
+        // pro každou vybranou veličinu samostatný graf, společný kurzor
+        val charts = ArrayList<ChartView>()
+        val selected = Metric.entries.filter { it in metrics }
+        val single = selected.size == 1
+        var any = false
+        for (m in selected) {
+            val series = seriesFor(m)
+            val chart = ChartView(a).apply {
+                this.series = series
+                title = if (single) null else m.label
+                if (m == Metric.HUM && NotifyPrefs(a).hum) band = NotifyPrefs(a).humMin.toDouble() to NotifyPrefs(a).humMax.toDouble()
+                onCursor = { t -> charts.forEach { other -> if (other !== this) other.cursorTime = t } }
+            }
+            charts.add(chart)
+            c.addView(chart, a.lp(h = a.dp(if (single) 220 else 170), top = if (single) 0 else 8))
+            // legenda + statistika
+            for (sr in series) {
+                val v = sr.values.filter { !it.isNaN() }
+                if (v.isEmpty()) continue
+                any = true
+                val r = a.hbox()
+                r.addView(a.text("● ${sr.name}", 13f, sr.color), a.lp(0, WRAP, 1f))
+                r.addView(a.text("min ${f1(v.min())}  ø ${f1(v.average())}  max ${f1(v.max())} ${sr.unit}", 12f, C.LABEL, condensed = true))
+                c.addView(r, a.lp(top = 4))
+            }
+            if (series.isEmpty()) c.addView(a.text("${m.label}: pro toto období nejsou data.", 12f, C.DIM), a.lp(top = 4))
         }
-        if (series.isEmpty()) c.addView(a.text("Pro toto období nejsou data.", 13f, C.DIM), a.lp(top = 6))
+        if (!any && selected.size > 1) c.addView(a.text("Pro toto období nejsou data.", 13f, C.DIM), a.lp(top = 6))
 
         c.addView(a.text("⬇ Exportovat období do CSV", 14f, C.ACCENT, bold = true).apply {
             setPadding(0, a.dp(12), 0, a.dp(2))

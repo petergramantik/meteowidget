@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import cz.gramantik.meteowidget.ui.C
@@ -33,11 +34,11 @@ class MainActivity : Activity() {
     }
 
     private lateinit var container: FrameLayout
-    private val tabs = ArrayList<TextView>()
+    private val tabs = ArrayList<ImageView>()
     private var screens = arrayOfNulls<Screen>(3)
     private var current = 0
     private lateinit var title: TextView
-    private lateinit var refreshBtn: TextView
+    private lateinit var refreshBtn: ImageView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,9 +51,9 @@ class MainActivity : Activity() {
         val bar = hbox().apply { setPadding(dp(16), dp(10), dp(8), dp(6)) }
         title = text("Meteostanice", 20f, C.WHITE, bold = true)
         bar.addView(title, lp(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        refreshBtn = barButton("⟳") { refreshData() }
+        refreshBtn = barButton(R.drawable.ic_refresh) { refreshData() }
         bar.addView(refreshBtn)
-        bar.addView(barButton("⚙") { startActivity(Intent(this, SettingsActivity::class.java)) })
+        bar.addView(barButton(R.drawable.ic_settings) { startActivity(Intent(this, SettingsActivity::class.java)) })
         root.addView(bar)
 
         container = FrameLayout(this)
@@ -63,20 +64,17 @@ class MainActivity : Activity() {
             setPadding(dp(8), dp(6), dp(8), dp(8))
             setBackgroundColor(0xFF0B0D10.toInt())
         }
-        listOf(
-            "Stanice" to R.drawable.ic_tab_station,
-            "Předpověď" to R.drawable.ic_tab_forecast,
-            "Radar" to R.drawable.ic_tab_radar,
-        ).forEachIndexed { i, (s, icon) ->
-            val t = text(s, 14f, C.DIM, bold = true).apply {
-                gravity = Gravity.CENTER
-                setPadding(dp(10), dp(10), dp(12), dp(10))
-                setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
-                compoundDrawablePadding = dp(6)
+        // záložky jen s piktogramy (název obrazovky je nahoře v liště)
+        listOf(R.drawable.ic_tab_station, R.drawable.ic_tab_forecast, R.drawable.ic_tab_radar).forEachIndexed { i, icon ->
+            val t = ImageView(this).apply {
+                setImageResource(icon)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setPadding(dp(8), dp(9), dp(8), dp(9))
+                contentDescription = listOf("Stanice", "Předpověď", "Radar")[i]
                 setOnClickListener { show(i) }
             }
             tabs.add(t)
-            nav.addView(t, lp(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f, start = 3, end = 3))
+            nav.addView(t, lp(0, dp(46), 1f, start = 10, end = 10))
         }
         root.addView(nav)
         setContentView(root)
@@ -95,17 +93,18 @@ class MainActivity : Activity() {
         if (intent.hasExtra(EXTRA_TAB)) show(intent.getIntExtra(EXTRA_TAB, 0))
     }
 
-    private fun barButton(s: String, onClick: () -> Unit) = text(s, 22f, C.WHITE).apply {
-        setPadding(dp(12), dp(4), dp(12), dp(4))
+    private fun barButton(icon: Int, onClick: () -> Unit) = ImageView(this).apply {
+        setImageResource(icon)
+        setColorFilter(C.WHITE)
+        setPadding(dp(10), dp(8), dp(10), dp(8))
+        layoutParams = LinearLayout.LayoutParams(dp(46), dp(42))
         setOnClickListener { onClick() }
     }
 
     private fun show(i: Int) {
         current = i
         tabs.forEachIndexed { j, t ->
-            val col = if (j == i) C.BG else C.DIM
-            t.setTextColor(col)
-            t.compoundDrawableTintList = android.content.res.ColorStateList.valueOf(col)
+            t.setColorFilter(if (j == i) C.BG else C.DIM)
             t.background = if (j == i) rounded(C.ACCENT, dp(18).toFloat()) else null
         }
         val s = screens[i] ?: when (i) {

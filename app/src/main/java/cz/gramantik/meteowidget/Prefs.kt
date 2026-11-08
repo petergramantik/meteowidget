@@ -45,6 +45,9 @@ class Prefs(ctx: Context) {
     var googleKey: String
         get() = str("googleKey")
         set(v) = put("googleKey", v.trim())
+    var mapyKey: String
+        get() = str("mapyKey")
+        set(v) = put("mapyKey", v.trim())
     var owmKey: String
         get() = str("owmKey")
         set(v) = put("owmKey", v.trim())

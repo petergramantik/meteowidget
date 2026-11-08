@@ -65,7 +65,6 @@ class SettingsActivity : Activity() {
         // ---------- předpověď ----------
         val source = findViewById<Spinner>(R.id.fc_source)
         val googleKey = findViewById<EditText>(R.id.google_key)
-        val googleKeyLabel = findViewById<View>(R.id.google_key_label)
         val locName = findViewById<EditText>(R.id.loc_name)
         val lat = findViewById<EditText>(R.id.loc_lat)
         val lon = findViewById<EditText>(R.id.loc_lon)
@@ -75,15 +74,24 @@ class SettingsActivity : Activity() {
         )
         source.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, sources.map { it.first })
         source.setSelection(sources.indexOfFirst { it.second == prefs.forecastSource }.coerceAtLeast(0))
-        source.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, pos: Int, id: Long) {
-                val vis = if (sources[pos].second == Prefs.SOURCE_GOOGLE) View.VISIBLE else View.GONE
-                googleKey.visibility = vis
-                googleKeyLabel.visibility = vis
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-        }
         googleKey.setText(prefs.googleKey)
+        val mapy = findViewById<EditText>(R.id.mapy_key)
+        mapy.setText(prefs.mapyKey)
+        // 👁 – zobrazit / skrýt klíč
+        listOf(
+            R.id.eye_secret to R.id.access_secret, R.id.eye_mapy to R.id.mapy_key,
+            R.id.eye_owm to R.id.owm_key, R.id.eye_google to R.id.google_key,
+        ).forEach { (eyeId, fieldId) ->
+            val f = findViewById<EditText>(fieldId)
+            findViewById<TextView>(eyeId).setOnClickListener {
+                val hidden = f.inputType and android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD != 0
+                f.inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    if (hidden) android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                    else android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                f.setSelection(f.text.length)
+            }
+        }
+        showKeyStatus()
         locName.setText(prefs.locName)
         lat.setText(prefs.lat.toString())
         lon.setText(prefs.lon.toString())
@@ -213,6 +221,7 @@ class SettingsActivity : Activity() {
             numFields.forEach { (e, set) -> e.text.toString().replace(',', '.').toFloatOrNull()?.let(set) }
             Alerts.setRegion(this, region.text.toString())
             prefs.owmKey = owm.text.toString()
+            prefs.mapyKey = mapy.text.toString()
             nightFrom.text.toString().toIntOrNull()?.let { tv.nightFrom = it }
             nightTo.text.toString().toIntOrNull()?.let { tv.nightTo = it }
             if (credentialsChanged) prefs.clearToken()
@@ -223,13 +232,57 @@ class SettingsActivity : Activity() {
             Thread {
                 Sync.run(this, forceForecast = true)
                 FetchWorker.schedulePeriodic(this)
+                testKeys()
                 val text = report()
                 runOnUiThread {
                     result.text = text
                     button.isEnabled = true
+                    showKeyStatus()
                 }
             }.start()
         }
+    }
+
+    // ---------- test klíčů ----------
+    private fun httpCode(url: String): Int = try {
+        val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        c.connectTimeout = 10_000; c.readTimeout = 10_000
+        c.setRequestProperty("User-Agent", "meteowidget-android")
+        val code = c.responseCode
+        c.disconnect()
+        code
+    } catch (e: Exception) {
+        -1
+    }
+
+    /** Ověří zadané klíče a výsledek uloží (✅/❌ u každého). */
+    private fun testKeys() {
+        val sp = getSharedPreferences("meteo", MODE_PRIVATE).edit()
+        fun res(code: Int) = when (code) {
+            in 200..299 -> "✅ funguje"
+            401, 403 -> "❌ klíč nefunguje (neplatný nebo zatím neaktivní)"
+            -1 -> "⚠ nelze ověřit – bez připojení"
+            else -> "❌ chyba HTTP $code"
+        }
+        sp.putString("stTuya", when {
+            !prefs.isConfigured -> "⚠ nevyplněno"
+            prefs.lastError == null -> "✅ funguje"
+            else -> "❌ " + (friendlyError(prefs.lastError, 0) ?: "")
+        })
+        sp.putString("stMapy", if (prefs.mapyKey.isEmpty()) "— nevyplněno (satelitní mapa nebude dostupná)"
+            else res(httpCode("https://api.mapy.com/v1/maptiles/aerial/256/7/70/44?apikey=" + java.net.URLEncoder.encode(prefs.mapyKey, "UTF-8"))))
+        sp.putString("stOwm", if (prefs.owmKey.isEmpty()) "— nevyplněno (nepovinné)"
+            else res(httpCode("https://tile.openweathermap.org/map/clouds_new/3/4/2.png?appid=" + java.net.URLEncoder.encode(prefs.owmKey, "UTF-8"))))
+        sp.putString("stGoogle", if (prefs.googleKey.isEmpty()) "— nevyplněno (nepovinné)"
+            else res(httpCode("https://weather.googleapis.com/v1/forecast/days:lookup?days=1&location.latitude=49&location.longitude=17&key=" +
+                java.net.URLEncoder.encode(prefs.googleKey, "UTF-8"))))
+        sp.apply()
+    }
+
+    private fun showKeyStatus() {
+        val sp = getSharedPreferences("meteo", MODE_PRIVATE)
+        listOf(R.id.st_tuya to "stTuya", R.id.st_mapy to "stMapy", R.id.st_owm to "stOwm", R.id.st_google to "stGoogle")
+            .forEach { (id, k) -> findViewById<TextView>(id).text = sp.getString(k, "") }
     }
 
     private fun backfillStats(): String {

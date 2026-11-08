@@ -65,21 +65,45 @@
   </div>
   <div id="layers"></div>
   <div id="attr">Radar: <a href="https://www.rainviewer.com/">Weather data by RainViewer</a> ·
-    Mapa: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ·
+    Mapa: <span id="mapAttr"></span> ·
     Hledání: <a href="https://open-meteo.com/">Open-Meteo</a><span id="owmAttr"></span></div>
 </div>
 
 <script>
-  var lat = parseFloat('__LAT__'), lon = parseFloat('__LON__'), placeName = '__NAME__', owmKey = '__OWM__';
+  var lat = parseFloat('__LAT__'), lon = parseFloat('__LON__'), placeName = '__NAME__', owmKey = '__OWM__', mapyKey = '__MAPY__';
   var msg = document.getElementById('msg');
 
   if (typeof L === 'undefined') {
     msg.textContent = 'Mapu se nepodařilo načíst – zkontroluj připojení.';
   } else {
     var map = L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 7);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 12, className: 'osm-dark'
-    }).addTo(map);
+
+    // ---------- podkladové mapy ----------
+    var baseLayers = [], baseMode = null;
+    function saved(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }
+    function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    function setBase(mode) {
+      if (mode === 'sat' && !mapyKey) { mode = 'osm'; alertMsg('Satelitní mapa potřebuje klíč Mapy.com (Nastavení → Klíče).'); }
+      baseLayers.forEach(function (l) { map.removeLayer(l); });
+      baseLayers = [];
+      if (mode === 'sat') {
+        baseLayers.push(L.tileLayer('https://api.mapy.com/v1/maptiles/aerial/256/{z}/{x}/{y}?apikey=' + mapyKey,
+          { maxZoom: 19, zIndex: 1 }));
+        baseLayers.push(L.tileLayer('https://api.mapy.com/v1/maptiles/names-overlay/256/{z}/{x}/{y}?apikey=' + mapyKey,
+          { maxZoom: 19, zIndex: 2 }));
+      } else if (mode === 'dark') {
+        baseLayers.push(L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, className: 'osm-dark', zIndex: 1 }));
+      } else {
+        baseLayers.push(L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, zIndex: 1 }));
+      }
+      baseLayers.forEach(function (l) { l.addTo(map); });
+      baseMode = mode;
+      store('baseMode', mode);
+      document.getElementById('mapAttr').innerHTML = mode === 'sat'
+        ? '<a href="https://mapy.com/"><img src="https://api.mapy.com/img/api/logo.svg" style="height:10px;vertical-align:-1px"></a> <a href="https://api.mapy.com/copyright">© Seznam.cz a.s. a další</a>'
+        : '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+      if (window.drawChips) drawChips();
+    }
     L.marker([lat, lon], { icon: L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [18, 18] }) })
       .addTo(map).bindTooltip(placeName || 'Stanice');
 
@@ -149,8 +173,13 @@
       b.className = 'chip ' + cls; b.textContent = text; b.onclick = onClick;
       layersEl.appendChild(b);
     }
-    function drawChips() {
+    window.drawChips = function () {
       layersEl.innerHTML = '';
+      chip('🛰 Satelit', baseMode === 'sat' ? 'on' : (mapyKey ? '' : 'off'), function () { setBase('sat'); });
+      chip('🗺 Běžná', baseMode === 'osm' ? 'on' : '', function () { setBase('osm'); });
+      chip('🌙 Tmavá', baseMode === 'dark' ? 'on' : '', function () { setBase('dark'); });
+      var sep = document.createElement('span'); sep.style.cssText = 'flex:none;width:1px;background:rgba(255,255,255,.25);margin:2px 2px';
+      layersEl.appendChild(sep);
       chip('🌧 Srážky', showRadar ? 'on' : '', function () { showRadar = !showRadar; show(idx); drawChips(); });
       chip('❄ Sníh zvlášť', snow ? 'on' : '', function () { snow = !snow; clearRadar(); show(idx); drawChips(); });
       OWM.forEach(function (o) {
@@ -159,7 +188,8 @@
           setOverlay(overlay === o.id ? null : o.id);
         });
       });
-    }
+    };
+    var drawChips = window.drawChips;
     function setOverlay(id) {
       if (overlayLayer) { map.removeLayer(overlayLayer); overlayLayer = null; }
       overlay = id;
@@ -179,7 +209,8 @@
       alertTimer = setTimeout(function () { msg.style.display = 'none'; }, 3500);
     }
     if (owmKey) document.getElementById('owmAttr').innerHTML = ' · Vrstvy: <a href="https://openweathermap.org/">OpenWeather</a>';
-    drawChips();
+    // výchozí satelitní mapa Mapy.com (bez klíče běžná)
+    setBase(saved('baseMode', 'sat'));
 
     // ---------- hledání místa ----------
     var q = document.getElementById('q'), res = document.getElementById('results'), found = null, searchTimer = null;

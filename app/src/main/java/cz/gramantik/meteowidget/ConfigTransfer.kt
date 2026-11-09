@@ -36,35 +36,58 @@ object ConfigTransfer {
         null
     }
 
-    // ---------- co se přenáší ----------
-    private val STRING_KEYS = listOf(
-        "accessId", "accessSecret", "deviceId", "host", "mapyKey", "owmKey", "googleKey",
-        "locName", "lat", "lon", "fcSource", "alertRegion",
-        "name_in", "name_out", "name_s1", "name_s2", "name_s3",
+    // ---------- co se přenáší: vše kromě dat a stavu zařízení ----------
+    private val SKIP_EXACT = setOf(
+        "token", "tokenExpiry", "lastData", "lastUpdate", "lastError",
+        "forecast", "forecastTime", "forecastFrom", "forecastError", "fullFcTime",
+        "pHist", "pBackfill", "histBackfillDone", "histBackfillTry", "histBackfillStats", "histChunksDone", "histCounts",
+        "gapTried", "updCheck", "updVersion", "updUrl", "alerts", "alertsTime", "seenAlerts",
+        "batteryAsk", "icsEvents", "icsTime", "icsError", "stTuya", "stMapy", "stOwm", "stGoogle", "stIcs",
     )
-    private val BOOL_KEYS = listOf("indoor1", "indoor2", "indoor3", "nHum")
-    private val FLOAT_KEYS = listOf("nHumMin", "nHumMax", "comfTMin", "comfTMax")
+    private val SKIP_PREFIX = listOf("nLast_", "mini_")
 
     private fun export(ctx: Context): String {
         val sp = ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE)
         val o = JSONObject()
-        STRING_KEYS.forEach { k -> sp.getString(k, null)?.let { o.put(k, it) } }
-        BOOL_KEYS.forEach { k -> if (sp.contains(k)) o.put(k, sp.getBoolean(k, true)) }
-        FLOAT_KEYS.forEach { k -> if (sp.contains(k)) o.put(k, sp.getFloat(k, 0f).toDouble()) }
-        // spec (měřítka hodnot) se převezme taky, ať box nemusí hádat
-        sp.getString("spec", null)?.let { o.put("spec", it) }
+        for ((k, v) in sp.all) {
+            if (k in SKIP_EXACT || SKIP_PREFIX.any { k.startsWith(it) } || v == null) continue
+            val e = JSONObject()
+            when (v) {
+                is String -> e.put("t", "s").put("v", v)
+                is Boolean -> e.put("t", "b").put("v", v)
+                is Int -> e.put("t", "i").put("v", v)
+                is Long -> e.put("t", "l").put("v", v)
+                is Float -> e.put("t", "f").put("v", v.toDouble())
+                is Set<*> -> e.put("t", "set").put("v", org.json.JSONArray(v.map { it.toString() }))
+                else -> continue
+            }
+            o.put(k, e)
+        }
         return o.toString()
     }
 
     private fun import(ctx: Context, json: String) {
         val o = JSONObject(json)
-        val e = ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE).edit()
-        STRING_KEYS.forEach { k -> if (o.has(k)) e.putString(k, o.getString(k)) }
-        BOOL_KEYS.forEach { k -> if (o.has(k)) e.putBoolean(k, o.getBoolean(k)) }
-        FLOAT_KEYS.forEach { k -> if (o.has(k)) e.putFloat(k, o.getDouble(k).toFloat()) }
-        if (o.has("spec")) e.putString("spec", o.getString("spec"))
-        e.remove("token").remove("tokenExpiry")
-        e.apply()
+        val ed = ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE).edit()
+        for (k in o.keys()) {
+            val e = o.optJSONObject(k) ?: continue
+            when (e.optString("t")) {
+                "s" -> ed.putString(k, e.getString("v"))
+                "b" -> ed.putBoolean(k, e.getBoolean("v"))
+                "i" -> ed.putInt(k, e.getInt("v"))
+                "l" -> ed.putLong(k, e.getLong("v"))
+                "f" -> ed.putFloat(k, e.getDouble("v").toFloat())
+                "set" -> {
+                    val a = e.getJSONArray("v")
+                    ed.putStringSet(k, (0 until a.length()).map { a.getString(it) }.toSet())
+                }
+            }
+        }
+        // přihlášení k Tuya a stažená data si box vytvoří sám
+        ed.remove("token").remove("tokenExpiry").remove("lastData")
+        ed.apply()
+        // nové plány spuštění TV apod. hned uplatnit
+        TvSchedule.reschedule(ctx)
     }
 
     // ---------- telefon: odeslání ----------

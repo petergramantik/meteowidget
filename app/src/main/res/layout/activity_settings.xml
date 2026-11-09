@@ -62,6 +62,14 @@
         </LinearLayout>
         <TextView android:id="@+id/st_owm" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" />
 
+        <TextView style="@style/Label" android:layout_marginTop="16dp" android:textStyle="bold" android:textColor="#333333" android:text="Kalendář – dnešní události na TV" />
+        <TextView style="@style/Label" android:text="Google Kalendář (web) → Nastavení → vyber kalendář → Integrace kalendáře → Tajná adresa ve formátu iCal. Adresu zkopíruj sem." />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <EditText android:id="@+id/ics_url" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:singleLine="true" android:hint="https://calendar.google.com/…/basic.ics" android:inputType="textPassword" />
+            <TextView android:id="@+id/eye_ics" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="10dp" android:text="👁" android:textSize="18sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/st_ics" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" />
+
         <TextView style="@style/Label" android:layout_marginTop="16dp" android:textStyle="bold" android:textColor="#333333" android:text="Google Weather API – volitelný zdroj předpovědi pro widget" />
         <TextView style="@style/Label" android:autoLink="web" android:text="Google Cloud projekt s Weather API: https://developers.google.com/maps/documentation/weather" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">

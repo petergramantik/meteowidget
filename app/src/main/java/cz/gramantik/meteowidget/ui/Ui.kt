@@ -94,6 +94,7 @@ fun Context.chip(s: String, selected: Boolean, onClick: () -> Unit): TextView =
         background = rounded(if (selected) C.ACCENT else C.CARD2, dp(14).toFloat(), dp(1), if (selected) C.ACCENT else C.LINE)
         setPadding(dp(12), dp(7), dp(12), dp(7))
         setOnClickListener { onClick() }
+        tvFocus(if (selected) C.ACCENT else C.LINE, 1.08f)
     }
 
 fun Context.chipRow(vararg chips: View): HorizontalScrollView = HorizontalScrollView(this).apply {
@@ -153,3 +154,40 @@ fun Context.grid(tiles: List<View>, cols: Int = 2): LinearLayout = vbox().apply 
         addView(row, lp(bottom = 8))
     }
 }
+
+
+/**
+ * Výrazné zvýraznění prvku vybraného ovladačem (TV): bílý rámeček / žlutý podklad a mírné zvětšení.
+ * Zachová případný dřívější posluchač focusu.
+ */
+fun View.tvFocus(restoreStroke: Int = C.LINE, scale: Float = 1.05f): View {
+    isFocusable = true
+    val d = resources.displayMetrics.density
+    val origBg = background
+    val old = onFocusChangeListener
+    setOnFocusChangeListener { v, has ->
+        old?.onFocusChange(v, has)
+        v.scaleX = if (has) scale else 1f
+        v.scaleY = if (has) scale else 1f
+        val bg = v.background
+        when {
+            bg is GradientDrawable -> bg.setStroke(((if (has) 3 else 1) * d).toInt(), if (has) Color.WHITE else restoreStroke)
+            has -> v.background = android.graphics.drawable.LayerDrawable(
+                arrayOf(
+                    origBg ?: android.graphics.drawable.ColorDrawable(0),
+                    GradientDrawable().apply {
+                        setColor(0x40FFC107); cornerRadius = 6 * d
+                        setStroke((3 * d).toInt(), 0xFFFFC107.toInt())
+                    }
+                )
+            )
+            else -> v.background = origBg
+        }
+    }
+    return this
+}
+
+/** Běží aplikace na televizi? */
+fun Context.isTv(): Boolean =
+    (getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager).currentModeType ==
+        android.content.res.Configuration.UI_MODE_TYPE_TELEVISION

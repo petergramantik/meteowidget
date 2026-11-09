@@ -61,7 +61,11 @@ class TvPrefs(ctx: Context) {
  * Celoobrazovkový panel: vykreslí TV rozložení, zvětší ho na obrazovku,
  * pravidelně obnovuje data, ztlumuje jas a posouvá obsah proti vypálení.
  */
-class TvPanel(private val ctx: Context) {
+class TvPanel(private val ctx: Context, interactive: Boolean = false) {
+    val home = TvHome(ctx, interactive)
+    /** index záložky s focusem (obnoví se po překreslení) */
+    var focusedTab = 0
+
     private val tv = TvPrefs(ctx)
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
@@ -78,34 +82,6 @@ class TvPanel(private val ctx: Context) {
         addView(content, FrameLayout.LayoutParams(-1, -1))
         addView(dim, FrameLayout.LayoutParams(-1, -1))
         addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fit() }
-    }
-
-    /** Tlačítko „⚙ Nastavení“ v rohu – jde na něj najet ovladačem a potvrdit OK. */
-    fun addSettingsButton(onClick: () -> Unit): View {
-        val d = ctx.resources.displayMetrics.density
-        val btn = android.widget.TextView(ctx).apply {
-            text = "⚙  Nastavení"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            setPadding((14 * d).toInt(), (8 * d).toInt(), (14 * d).toInt(), (8 * d).toInt())
-            isFocusable = true
-            isClickable = true
-            background = android.graphics.drawable.StateListDrawable().apply {
-                addState(intArrayOf(android.R.attr.state_focused), android.graphics.drawable.GradientDrawable().apply {
-                    setColor(0xFFFFD54F.toInt()); cornerRadius = 20 * d
-                })
-                addState(intArrayOf(), android.graphics.drawable.GradientDrawable().apply {
-                    setColor(0x99171B21.toInt()); cornerRadius = 20 * d; setStroke((1 * d).toInt(), 0x55FFFFFF)
-                })
-            }
-            setOnFocusChangeListener { v, has -> (v as android.widget.TextView).setTextColor(if (has) Color.BLACK else Color.WHITE) }
-            setOnClickListener { onClick() }
-        }
-        root.addView(btn, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.TOP or android.view.Gravity.END).apply {
-            topMargin = (12 * d).toInt(); rightMargin = (16 * d).toInt()
-        })
-        btn.requestFocus()
-        return btn
     }
 
     /** Krátká nápověda ovládání po spuštění. */
@@ -144,86 +120,24 @@ class TvPanel(private val ctx: Context) {
         handler.removeCallbacks(tick)
     }
 
-    /** Uvolní animované ikony (volat při zavření obrazovky). */
+    /** Uvolní obrazovku (volat při zavření). */
     fun release() {
         stop()
-        webViews.values.forEach { (it.parent as? ViewGroup)?.removeView(it); it.destroy() }
-        webViews.clear()
+        content.removeAllViews()
     }
-
-    // ---------- animované ikony (SVG Meteocons ve WebView) ----------
-    private val webViews = HashMap<Int, WebView>()
-
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun webViewFor(i: Int, key: String): WebView {
-        val wv = webViews.getOrPut(i) {
-            WebView(ctx).apply {
-                setBackgroundColor(Color.TRANSPARENT)
-                isFocusable = false
-                isFocusableInTouchMode = false
-                isVerticalScrollBarEnabled = false
-                isHorizontalScrollBarEnabled = false
-                settings.javaScriptEnabled = false
-            }
-        }
-        if (wv.tag != key) {
-            wv.tag = key
-            val html = "<html><body style='margin:0;background:transparent'>" +
-                "<img src='file:///android_asset/meteocons/$key.svg' style='width:100%;height:100%'>" +
-                "</body></html>"
-            wv.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "utf-8", null)
-        }
-        return wv
-    }
-
-    /** Nahradí statické ikony v řádku předpovědi animovanými. */
-    private fun animateIcons(view: View) {
-        if (!tv.animatedIcons || tv.isNight()) {
-            webViews.values.forEach { (it.parent as? ViewGroup)?.removeView(it) }
-            return
-        }
-        val row = view.findViewById<ViewGroup>(R.id.forecast_row) ?: return
-        val days = Prefs(ctx).forecast.take(10)
-        for (i in 0 until minOf(row.childCount, days.size)) {
-            val key = days[i].icon
-            if (WidgetRenderer.iconRes(ctx, key) == 0) continue
-            val img = row.getChildAt(i).findViewById<ImageView>(R.id.fc_img) ?: continue
-            val parent = img.parent as ViewGroup
-            val index = parent.indexOfChild(img)
-            val lp = img.layoutParams
-            val wv = webViewFor(i, key)
-            (wv.parent as? ViewGroup)?.removeView(wv)
-            parent.removeView(img)
-            parent.addView(wv, index, lp)
-        }
-    }
-
-    /** Stáhne nová data, pokud jsou starší než 5 min. */
-    private fun maybeSync(force: Boolean = false) {
-        val p = Prefs(ctx)
-        if (syncing) return
-        if (!force && System.currentTimeMillis() - p.lastUpdate < 5 * 60_000) return
-        syncing = true
-        Thread {
-            try {
-                Sync.run(ctx)
-            } finally {
-                handler.post {
-                    syncing = false
-                    if (running) render()
-                }
-            }
-        }.start()
-    }
-
-    fun refreshNow() = maybeSync(force = true)
 
     fun render() {
-        val view = WidgetRenderer.buildTv(ctx).apply(ctx, content)
-        view.isClickable = false
+        val animated = tv.animatedIcons && !tv.isNight()
+        val view = home.build(animated)
         content.removeAllViews()
         content.addView(view)
-        animateIcons(view)
+        // focus zpět na stejnou záložku
+        home.tabViews.forEachIndexed { i, t ->
+            t.setOnFocusChangeListener(t.onFocusChangeListener.let { old ->
+                android.view.View.OnFocusChangeListener { v, has -> old?.onFocusChange(v, has); if (has) focusedTab = i }
+            })
+        }
+        home.tabViews.getOrNull(focusedTab)?.requestFocus()
         // posun obsahu o pár dp každých 10 minut
         val now = System.currentTimeMillis()
         if (now - lastShift > 10 * 60_000) {

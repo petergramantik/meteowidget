@@ -19,6 +19,8 @@ import cz.gramantik.meteowidget.ui.RadarScreen
 import cz.gramantik.meteowidget.ui.StationScreen
 import cz.gramantik.meteowidget.ui.dp
 import cz.gramantik.meteowidget.ui.hbox
+import cz.gramantik.meteowidget.ui.isTv
+import cz.gramantik.meteowidget.ui.tvFocus
 import cz.gramantik.meteowidget.ui.lp
 import cz.gramantik.meteowidget.ui.rounded
 import cz.gramantik.meteowidget.ui.text
@@ -72,6 +74,7 @@ class MainActivity : Activity() {
                 setPadding(dp(8), dp(9), dp(8), dp(9))
                 contentDescription = listOf("Stanice", "Předpověď", "Radar")[i]
                 setOnClickListener { show(i) }
+                tvFocus(scale = 1.12f)
             }
             tabs.add(t)
             nav.addView(t, lp(0, dp(46), 1f, start = 10, end = 10))
@@ -86,7 +89,7 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         show(intent?.getIntExtra(EXTRA_TAB, 0) ?: 0)
-        askBatteryExemption()
+        if (isTv()) tabs[current].post { tabs[current].requestFocus() } else askBatteryExemption()
         if (!Prefs(this).isConfigured) startActivity(Intent(this, SettingsActivity::class.java))
         else if (System.currentTimeMillis() - Prefs(this).lastUpdate > 5 * 60_000) refreshData()
     }
@@ -113,7 +116,10 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.hasExtra(EXTRA_TAB)) show(intent.getIntExtra(EXTRA_TAB, 0))
+        if (intent.hasExtra(EXTRA_TAB)) {
+            show(intent.getIntExtra(EXTRA_TAB, 0))
+            if (isTv()) tabs[current].requestFocus()
+        }
     }
 
     private fun barButton(icon: Int, onClick: () -> Unit) = ImageView(this).apply {
@@ -122,6 +128,7 @@ class MainActivity : Activity() {
         setPadding(dp(10), dp(8), dp(10), dp(8))
         layoutParams = LinearLayout.LayoutParams(dp(46), dp(42))
         setOnClickListener { onClick() }
+        tvFocus(scale = 1.15f)
     }
 
     private fun show(i: Int) {

@@ -15,7 +15,6 @@ import android.widget.Toast
  */
 class DashboardActivity : Activity() {
     private lateinit var panel: TvPanel
-    private lateinit var settingsBtn: android.view.View
     private var toast: Toast? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,10 +33,10 @@ class DashboardActivity : Activity() {
         }
         TvSchedule.running = java.lang.ref.WeakReference(this)
         TvSchedule.reschedule(this)
-        panel = TvPanel(this)
+        panel = TvPanel(this, interactive = true)
+        panel.home.onTab = { openTab(it) }
         setContentView(panel.root)
-        settingsBtn = panel.addSettingsButton { openSettings() }
-        panel.showHint("OK = nastavení  ·  ↑ ↓ jas  ·  → obnovit")
+        panel.showHint("← → záložky  ·  OK otevřít  ·  ↑ ↓ jas")
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             window.insetsController?.let {
                 it.hide(WindowInsets.Type.systemBars())
@@ -81,12 +80,21 @@ class DashboardActivity : Activity() {
 
     private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java))
 
-    /**
-     * Klávesy zachytáváme už na úrovni okna, aby je nic nepřebilo.
-     * OK potvrdí tlačítko Nastavení (má focus), Menu otevře nastavení vždy.
-     */
+    /** Záložky: 0 Přehled, 1 Historie, 2 Předpověď, 3 Radar, 4 Nastavení. */
+    private fun openTab(i: Int) {
+        when (i) {
+            0 -> panel.refreshNow()
+            1, 2, 3 -> startActivity(
+                Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, i - 1)
+            )
+            4 -> openSettings()
+        }
+    }
+
+    /** Ovládání ovladačem zachycené na úrovni okna. */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+        val tabs = panel.home.tabViews
         when (event.keyCode) {
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> { openSettings(); return true }
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
@@ -94,15 +102,17 @@ class DashboardActivity : Activity() {
                 show((if (panel.isNight) "Noční jas" else "Jas") + ": $b %")
                 return true
             }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                show("Obnovuji…")
-                panel.refreshNow()
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (tabs.isEmpty()) return true
+                val cur = tabs.indexOfFirst { it.isFocused }.let { if (it < 0) panel.focusedTab else it }
+                val next = (cur + if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1).coerceIn(0, tabs.size - 1)
+                tabs[next].requestFocus()
+                panel.focusedTab = next
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
             KeyEvent.KEYCODE_BUTTON_A -> {
-                if (!settingsBtn.isFocused) settingsBtn.requestFocus()
-                openSettings()
+                openTab(tabs.indexOfFirst { it.isFocused }.let { if (it < 0) panel.focusedTab else it })
                 return true
             }
         }

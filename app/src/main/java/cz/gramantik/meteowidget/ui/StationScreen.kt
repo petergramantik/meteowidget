@@ -138,6 +138,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             setPadding(a.dp(6), a.dp(4), a.dp(6), a.dp(6))
             if (openChannel == ch) background = selBg()
             setOnClickListener { toggleChannel(ch) }
+            tvFocus(if (openChannel == ch) 0x88FFD54F.toInt() else C.LINE, 1.03f)
         }
         row.addView(col(Channel.IN, w.tempIn, w.humIn, C.IN, Gravity.START), a.lp(0, WRAP, 1f, end = 4))
         row.addView(col(Channel.OUT, w.tempOut, w.humOut, C.OUT, Gravity.END), a.lp(0, WRAP, 1f, start = 4))
@@ -152,6 +153,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
                     setPadding(a.dp(6), a.dp(6), a.dp(6), a.dp(6))
                     if (openChannel == ch) background = selBg()
                     setOnClickListener { toggleChannel(ch) }
+                    tvFocus(if (openChannel == ch) 0x88FFD54F.toInt() else C.LINE, 1.03f)
                 }
                 big.addView(r, a.lp(bottom = 2))
             }
@@ -308,6 +310,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             sp.edit().putBoolean("outHumAbs", !abs).apply()
             refresh()
         }
+        tile.tvFocus(scale = 1.04f)
         return tile
     }
 
@@ -511,8 +514,9 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         if (!any && selected.size > 1) c.addView(a.text("Pro toto období nejsou data.", 13f, C.DIM), a.lp(top = 6))
 
         c.addView(a.text("⬇ Exportovat období do CSV", 14f, C.ACCENT, bold = true).apply {
-            setPadding(0, a.dp(12), 0, a.dp(2))
+            setPadding(a.dp(4), a.dp(12), a.dp(4), a.dp(2))
             setOnClickListener { export(from, to) }
+            tvFocus()
         })
     }
 

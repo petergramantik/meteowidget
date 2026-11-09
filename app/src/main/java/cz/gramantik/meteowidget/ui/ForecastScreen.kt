@@ -162,6 +162,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                 gravity = Gravity.CENTER
                 setPadding(a.dp(4), a.dp(20), a.dp(4), a.dp(20))
                 setOnClickListener { hsv.smoothScrollBy(dir * a.dp(76) * 4, 0) }
+                tvFocus(scale = 1.2f)
             }
             val left = arrow("‹", -1)
             val right = arrow("›", 1)
@@ -280,6 +281,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                     refresh()
                 }
             }
+            box.tvFocus(if (jump) 0x66FFD54F else 0, 1.02f)
             c.addView(box, a.lp(bottom = 6))
         }
         val times = ds.map { ms(it.date.atTime(12, 0)) }.toLongArray()

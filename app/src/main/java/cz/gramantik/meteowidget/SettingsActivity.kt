@@ -14,6 +14,8 @@ import android.widget.EditText
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
+import cz.gramantik.meteowidget.ui.isTv
+import cz.gramantik.meteowidget.ui.tvFocus
 
 class SettingsActivity : Activity() {
 
@@ -27,7 +29,6 @@ class SettingsActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
         prefs = Prefs(this)
-        setupTvFocus()
         setupTransfer()
 
         // ---------- aktualizace ----------
@@ -80,10 +81,12 @@ class SettingsActivity : Activity() {
         googleKey.setText(prefs.googleKey)
         val mapy = findViewById<EditText>(R.id.mapy_key)
         mapy.setText(prefs.mapyKey)
+        val ics = findViewById<EditText>(R.id.ics_url)
+        ics.setText(CalendarIcs.url(this))
         // 👁 – zobrazit / skrýt klíč
         listOf(
             R.id.eye_secret to R.id.access_secret, R.id.eye_mapy to R.id.mapy_key,
-            R.id.eye_owm to R.id.owm_key, R.id.eye_google to R.id.google_key,
+            R.id.eye_owm to R.id.owm_key, R.id.eye_google to R.id.google_key, R.id.eye_ics to R.id.ics_url,
         ).forEach { (eyeId, fieldId) ->
             val f = findViewById<EditText>(fieldId)
             findViewById<TextView>(eyeId).setOnClickListener {
@@ -256,6 +259,7 @@ class SettingsActivity : Activity() {
             Alerts.setRegion(this, region.text.toString())
             prefs.owmKey = owm.text.toString()
             prefs.mapyKey = mapy.text.toString()
+            CalendarIcs.setUrl(this, ics.text.toString())
             nightFrom.text.toString().toIntOrNull()?.let { tv.nightFrom = it }
             nightTo.text.toString().toIntOrNull()?.let { tv.nightTo = it }
             if (credentialsChanged) prefs.clearToken()
@@ -283,17 +287,15 @@ class SettingsActivity : Activity() {
     // ---------- ovládání ovladačem (TV) ----------
     /** Žlutý rámeček u vybraného prvku; ikonky 👁 se při procházení přeskočí. */
     private fun setupTvFocus() {
-        listOf(R.id.eye_secret, R.id.eye_mapy, R.id.eye_owm, R.id.eye_google).forEach {
+        listOf(R.id.eye_secret, R.id.eye_mapy, R.id.eye_owm, R.id.eye_google, R.id.eye_ics).forEach {
             findViewById<View>(it)?.isFocusable = false
         }
         fun walk(v: View) {
             if (v is android.view.ViewGroup) {
                 for (i in 0 until v.childCount) walk(v.getChildAt(i))
             }
-            if (v.isFocusable && android.os.Build.VERSION.SDK_INT >= 23 &&
-                (v is EditText || v is Button || v is CheckBox || v is Spinner || v is SeekBar)
-            ) {
-                v.foreground = getDrawable(R.drawable.focus_frame)
+            if (v is EditText || v is Button || v is CheckBox || v is Spinner || v is SeekBar) {
+                v.tvFocus(scale = if (v is EditText || v is SeekBar || v is Spinner) 1.0f else 1.04f)
             }
         }
         walk(window.decorView)
@@ -348,6 +350,13 @@ class SettingsActivity : Activity() {
                 .setNegativeButton("Zrušit", null)
                 .show()
         }
+    }
+
+    /** Zvýraznění až po nastavení všech posluchačů v onCreate (aby se zachovaly). */
+    override fun onPostCreate(savedInstanceState: Bundle?) {
+        super.onPostCreate(savedInstanceState)
+        setupTvFocus()
+        if (isTv()) findViewById<View>(R.id.send_cfg)?.requestFocus()
     }
 
     override fun onDestroy() {
@@ -417,6 +426,9 @@ class SettingsActivity : Activity() {
             else res(httpCode("https://api.mapy.com/v1/maptiles/aerial/256/7/70/44?apikey=" + java.net.URLEncoder.encode(prefs.mapyKey, "UTF-8"))))
         sp.putString("stOwm", if (prefs.owmKey.isEmpty()) "— nevyplněno (nepovinné)"
             else res(httpCode("https://tile.openweathermap.org/map/clouds_new/3/4/2.png?appid=" + java.net.URLEncoder.encode(prefs.owmKey, "UTF-8"))))
+        sp.putString("stIcs", if (CalendarIcs.url(this).isEmpty()) "— nevyplněno (nepovinné)"
+            else CalendarIcs.error(this)?.let { "❌ $it" }
+                ?: "✅ funguje – dnes ${CalendarIcs.events(this, java.time.LocalDate.now()).size} událostí")
         sp.putString("stGoogle", if (prefs.googleKey.isEmpty()) "— nevyplněno (nepovinné)"
             else res(httpCode("https://weather.googleapis.com/v1/forecast/days:lookup?days=1&location.latitude=49&location.longitude=17&key=" +
                 java.net.URLEncoder.encode(prefs.googleKey, "UTF-8"))))
@@ -425,7 +437,7 @@ class SettingsActivity : Activity() {
 
     private fun showKeyStatus() {
         val sp = getSharedPreferences("meteo", MODE_PRIVATE)
-        listOf(R.id.st_tuya to "stTuya", R.id.st_mapy to "stMapy", R.id.st_owm to "stOwm", R.id.st_google to "stGoogle")
+        listOf(R.id.st_tuya to "stTuya", R.id.st_mapy to "stMapy", R.id.st_owm to "stOwm", R.id.st_google to "stGoogle", R.id.st_ics to "stIcs")
             .forEach { (id, k) -> findViewById<TextView>(id).text = sp.getString(k, "") }
     }
 

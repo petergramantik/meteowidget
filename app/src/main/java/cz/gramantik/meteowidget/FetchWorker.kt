@@ -80,6 +80,13 @@ object Sync {
                 // výstrahy nejsou kritické
             }
         }
+        // kalendář (iCal) – každých 30 min, nebo hned po půlnoci kvůli novému dni
+        if (CalendarIcs.url(ctx).isNotEmpty() &&
+            (forceForecast || now - CalendarIcs.fetchedAt(ctx) > 30 * 60_000L ||
+                java.time.Instant.ofEpochMilli(CalendarIcs.fetchedAt(ctx)).atZone(java.time.ZoneId.systemDefault()).toLocalDate() != java.time.LocalDate.now())
+        ) {
+            CalendarIcs.fetch(ctx)
+        }
         if (now - p.updateCheckTime > UPDATE_EVERY) {
             try {
                 Updater.check(ctx)

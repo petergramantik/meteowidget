@@ -10,7 +10,7 @@ class MeteoDream : DreamService() {
         super.onAttachedToWindow()
         isInteractive = false
         isFullscreen = true
-        val p = TvPanel(this)
+        val p = TvPanel(this, interactive = false)
         isScreenBright = !p.isNight
         panel = p
         setContentView(p.root)

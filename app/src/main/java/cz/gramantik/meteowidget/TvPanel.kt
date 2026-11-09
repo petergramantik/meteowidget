@@ -120,6 +120,26 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
         handler.removeCallbacks(tick)
     }
 
+    /** Stáhne nová data, pokud jsou starší než 5 min. */
+    private fun maybeSync(force: Boolean = false) {
+        val p = Prefs(ctx)
+        if (syncing) return
+        if (!force && System.currentTimeMillis() - p.lastUpdate < 5 * 60_000) return
+        syncing = true
+        Thread {
+            try {
+                Sync.run(ctx)
+            } finally {
+                handler.post {
+                    syncing = false
+                    if (running) render()
+                }
+            }
+        }.start()
+    }
+
+    fun refreshNow() = maybeSync(force = true)
+
     /** Uvolní obrazovku (volat při zavření). */
     fun release() {
         stop()

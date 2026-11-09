@@ -207,7 +207,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             Triple("SVĚTLO", "${f1(w?.lightKlux)} klux", C.LIGHT) to "",
         )
         val grid = c.vbox()
-        tiles.chunked(2).forEach { pair ->
+        tiles.chunked(2).forEachIndexed { ri, pair ->
             val r = c.hbox(Gravity.TOP)
             pair.forEachIndexed { i, (head, sub) ->
                 val tile = c.vbox().apply {
@@ -217,11 +217,12 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                     addView(c.text(head.second, 15f, head.third, condensed = true), c.lp(WRAP, WRAP, top = 2))
                     addView(c.text(sub, 8f, C.DIM))
                 }
-                r.addView(tile, c.lp(0, c.dp(52), 1f, end = if (i == 0) 5 else 0))
+                r.addView(tile, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (i == 0) 5 else 0))
             }
-            grid.addView(r, c.lp(bottom = 6))
+            // tři řady přesně na výšku sousedních panelů (168 dp)
+            grid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri < 2) 5 else 0))
         }
-        row.addView(grid, c.lp(c.dp(170), WRAP, end = 8))
+        row.addView(grid, c.lp(c.dp(170), c.dp(168), end = 8))
 
         // vpravo: Dnes – svátek, kalendář, teď
         val right = panel()

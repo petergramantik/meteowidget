@@ -84,8 +84,29 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         show(intent?.getIntExtra(EXTRA_TAB, 0) ?: 0)
+        askBatteryExemption()
         if (!Prefs(this).isConfigured) startActivity(Intent(this, SettingsActivity::class.java))
         else if (System.currentTimeMillis() - Prefs(this).lastUpdate > 5 * 60_000) refreshData()
+    }
+
+    /**
+     * Samsung uspává aplikace mimo Google Play – bez výjimky z optimalizace baterie
+     * v noci neběží sběr dat. Nabídne výjimku (nejvýš jednou za 3 dny).
+     */
+    private fun askBatteryExemption() {
+        if (Battery.isUnrestricted(this)) return
+        val sp = getSharedPreferences("meteo", MODE_PRIVATE)
+        if (System.currentTimeMillis() - sp.getLong("batteryAsk", 0) < 3 * 86_400_000L) return
+        sp.edit().putLong("batteryAsk", System.currentTimeMillis()).apply()
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Sběr dat na pozadí")
+            .setMessage(
+                "Telefon aplikaci v noci uspává, a proto v historii chybí data. " +
+                    "Povol prosím aplikaci běžet bez omezení baterie."
+            )
+            .setPositiveButton("Povolit") { _, _ -> Battery.requestExemption(this) }
+            .setNegativeButton("Teď ne", null)
+            .show()
     }
 
     override fun onNewIntent(intent: Intent) {

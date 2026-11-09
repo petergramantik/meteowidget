@@ -172,6 +172,16 @@
         <EditText android:id="@+id/alert_region" style="@style/Field" android:inputType="text" />
 
         <TextView style="@style/Section" android:text="Historie" />
+        <TextView
+            android:id="@+id/battery_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp" />
+        <Button
+            android:id="@+id/battery_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nastavení baterie aplikace" />
         <Button
             android:id="@+id/backfill"
             android:layout_width="wrap_content"

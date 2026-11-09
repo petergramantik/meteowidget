@@ -43,8 +43,23 @@ object HistoryBackfill {
     fun run(ctx: Context, p: Prefs, client: TuyaClient): Int {
         val now = System.currentTimeMillis()
         sp(ctx).edit().putLong("histBackfillTry", now).apply()
+        val n = fillRange(ctx, p, client, now - 7 * 24 * 3_600_000L, now, 25, saveStats = true)
+        if (n >= 0) sp(ctx).edit().putBoolean("histBackfillDone", true).apply()
+        return n.coerceAtLeast(0)
+    }
 
-        val from = now - 7 * 24 * 3_600_000L
+    /**
+     * Doplní mezeru v historii (např. když telefon v noci uspal aplikaci).
+     * Každou mezeru zkusí jen jednou.
+     */
+    fun fillGap(ctx: Context, p: Prefs, client: TuyaClient, from: Long, to: Long): Int {
+        if (sp(ctx).getLong("gapTried", 0) == from) return 0
+        sp(ctx).edit().putLong("gapTried", from).apply()
+        return fillRange(ctx, p, client, from, to, 10, saveStats = false).coerceAtLeast(0)
+    }
+
+    /** Vrací počet vložených záznamů, nebo -1, když Tuya nevrátila nic. */
+    private fun fillRange(ctx: Context, p: Prefs, client: TuyaClient, from: Long, now: Long, pages: Int, saveStats: Boolean): Int {
         val slots = HashMap<Long, HashMap<String, Any>>()
         val stats = JSONObject()
         var anyOk = false
@@ -52,14 +67,14 @@ object HistoryBackfill {
             var logs: List<Pair<Long, Double>> = emptyList()
             var note = ""
             try {
-                logs = client.fetchReportLogs(code, from, now, maxPages = 25)
+                logs = client.fetchReportLogs(code, from, now, maxPages = pages)
                 note = "v2"
             } catch (e: Exception) {
                 note = "v2 chyba: ${e.message}"
             }
             if (logs.isEmpty()) {
                 try {
-                    logs = client.fetchLogsV1(code, from, now, maxPages = 25)
+                    logs = client.fetchLogsV1(code, from, now, maxPages = pages)
                     note += ", v1"
                 } catch (e: Exception) {
                     note += ", v1 chyba: ${e.message}"
@@ -69,8 +84,8 @@ object HistoryBackfill {
             stats.put(code, "${logs.size} záznamů ($note)")
             for ((t, v) in logs) slots.getOrPut(t / SLOT * SLOT) { HashMap() }[code] = v
         }
-        sp(ctx).edit().putString("histBackfillStats", stats.toString()).apply()
-        if (!anyOk) return 0
+        if (saveStats) sp(ctx).edit().putString("histBackfillStats", stats.toString()).apply()
+        if (!anyOk) return -1
 
         val db = MeteoDb.get(ctx)
         val spec = p.spec
@@ -84,7 +99,6 @@ object HistoryBackfill {
             db.insert(Sample.from(t, Weather(HashMap(carry), spec)), replace = false)
             inserted++
         }
-        sp(ctx).edit().putBoolean("histBackfillDone", true).apply()
         return inserted
     }
 }

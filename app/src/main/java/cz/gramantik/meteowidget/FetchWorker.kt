@@ -29,6 +29,14 @@ object Sync {
                 val w = Weather(data, p.spec)
                 w.pressure?.let { PressureHistory.add(ctx, listOf(t to it)) }
                 val prev = db.last()
+                // mezera v historii (telefon uspal aplikaci) -> zkusit doplnit z Tuya
+                if (prev != null && t - prev.t > 30 * 60_000L) {
+                    try {
+                        HistoryBackfill.fillGap(ctx, p, client, prev.t, t)
+                    } catch (e: Exception) {
+                        // nevadí
+                    }
+                }
                 // do historie nejvýš 1 záznam za 5 minut
                 if (prev == null || t - prev.t > 5 * 60_000L) db.insert(Sample.from(t, w))
                 try {

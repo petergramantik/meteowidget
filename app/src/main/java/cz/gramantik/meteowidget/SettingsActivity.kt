@@ -136,6 +136,11 @@ class SettingsActivity : Activity() {
         val owm = findViewById<EditText>(R.id.owm_key)
         owm.setText(prefs.owmKey)
 
+        // ---------- sběr na pozadí ----------
+        findViewById<Button>(R.id.battery_button).setOnClickListener {
+            if (!Battery.isUnrestricted(this)) Battery.requestExemption(this) else Battery.openAppSettings(this)
+        }
+
         // ---------- historie ----------
         val backfillResult = findViewById<TextView>(R.id.backfill_result)
         backfillResult.text = backfillStats()
@@ -380,6 +385,10 @@ class SettingsActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        findViewById<TextView>(R.id.battery_status)?.text =
+            if (Battery.isUnrestricted(this)) "Sběr na pozadí: ✅ bez omezení baterie"
+            else "Sběr na pozadí: ⚠ omezeno optimalizací baterie – v noci mohou chybět data. " +
+                "Klepni níže a povol běh bez omezení. Na Samsungu zkontroluj i Péče o baterii → Uspané aplikace."
         if (::updateButton.isInitialized) refreshUpdateUi()
     }
 }

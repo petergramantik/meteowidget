@@ -247,24 +247,30 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
             if (list.isEmpty()) return null
             return Series(name, color, list.map { it.t }.toLongArray(), list.map { it.get(col)!! }.toDoubleArray(), unit = unit)
         }
-        val sensorColors = listOf(C.SENSOR, 0xFF9FA8DA.toInt(), 0xFFCE93D8.toInt())
-        val sensorCh = listOf(Channel.S1, Channel.S2, Channel.S3)
-        // čidla, která mají data
-        val available = (1..3).filter { i -> samples.any { it.get((if (temp) "t" else "h") + i) != null } }
-        val series = listOfNotNull(
-            s(if (temp) "tin" else "hin", p.channelName(Channel.IN), C.IN),
-            s(if (temp) "tout" else "hout", p.channelName(Channel.OUT), C.OUT),
-        ) + available.filter { n.humChart(it) }.mapNotNull { i ->
-            s((if (temp) "t" else "h") + i, p.channelName(sensorCh[i - 1]), sensorColors[i - 1])
-        }
+        // všechna čidla zapínatelná; výběr zvlášť pro teplotu a vlhkost
+        data class Ch(val ch: Channel, val col: String, val color: Int)
+        val pre = if (temp) "t" else "h"
+        val all = listOf(
+            Ch(Channel.IN, pre + "in", C.IN), Ch(Channel.OUT, pre + "out", C.OUT),
+            Ch(Channel.S1, pre + "1", C.SENSOR), Ch(Channel.S2, pre + "2", 0xFF9FA8DA.toInt()), Ch(Channel.S3, pre + "3", 0xFFCE93D8.toInt()),
+        ).filter { c -> samples.any { it.get(c.col) != null } || c.ch == Channel.IN || c.ch == Channel.OUT }
+        val metricKey = if (temp) "temp" else "hum"
+        fun isOn(c: Ch) = sp.getBoolean("p24_${metricKey}_${c.ch.key}", c.ch == Channel.IN || c.ch == Channel.OUT)
+        val series = all.filter { isOn(it) }.mapNotNull { s(it.col, p.channelName(it.ch), it.color) }
 
         val c = a.card((if (temp) "Teplota" else "Vlhkost") + " – 24 h")
         val chips = mutableListOf(
             a.chip("Vlhkost", !temp) { sp.edit().putString("panel24Metric", "hum").apply(); refresh() },
             a.chip("Teplota", temp) { sp.edit().putString("panel24Metric", "temp").apply(); refresh() },
         )
-        available.forEach { i ->
-            chips.add(a.chip("+ " + p.channelName(sensorCh[i - 1]), n.humChart(i)) { n.setHumChart(i, !n.humChart(i)); refresh() })
+        all.forEach { c ->
+            val on = isOn(c)
+            chips.add(a.chip((if (on) "✓ " else "+ ") + p.channelName(c.ch), on) {
+                // aspoň jedno čidlo musí zůstat zapnuté
+                if (on && all.count { isOn(it) } <= 1) return@chip
+                sp.edit().putBoolean("p24_${metricKey}_${c.ch.key}", !on).apply()
+                refresh()
+            })
         }
         c.addView(a.chipRow(*chips.toTypedArray()), a.lp(bottom = 8))
         val zone = if (temp) n.tempMin.toDouble() to n.tempMax.toDouble()

@@ -57,6 +57,7 @@ class ChartView(ctx: Context) : View(ctx) {
         set(v) { field = v; invalidate() }
     private val bandPaint = Paint().apply { color = BAND_COLOR }
     private val dot = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val gapPaint = Paint().apply { color = 0x14FFFFFF }
 
     private val d = resources.displayMetrics.density
     private val grid = Paint().apply { color = 0x22FFFFFF; strokeWidth = 1f }
@@ -146,7 +147,6 @@ class ChartView(ctx: Context) : View(ctx) {
         val main = all.filter { !it.ownAxis }
         val second = all.filter { it.ownAxis }
         var r1 = range(main.ifEmpty { all }) ?: return
-        band?.let { b -> r1 = minOf(r1.first, b.first) to maxOf(r1.second, b.second) }
         val r2 = range(second)
 
         val left = 34f * d
@@ -159,7 +159,27 @@ class ChartView(ctx: Context) : View(ctx) {
         gLeft = left; gRight = right; gT0 = t0; gT1 = t1
         fun y(v: Double, r: Pair<Double, Double>) = (bottom - (v - r.first) / (r.second - r.first) * (bottom - top)).toFloat()
 
-        band?.let { b -> c.drawRect(left, y(b.second, r1), right, y(b.first, r1), bandPaint) }
+        band?.let { b ->
+            val yTop = y(b.second, r1).coerceIn(top, bottom)
+            val yBot = y(b.first, r1).coerceIn(top, bottom)
+            if (yBot > yTop) c.drawRect(left, yTop, right, yBot, bandPaint)
+        }
+
+        // výpadky sběru dat – šedý pruh „bez dat“
+        run {
+            val times = all.filter { !it.bars }.flatMap { sr -> sr.times.filterIndexed { i, _ -> !sr.values[i].isNaN() } }
+                .distinct().sorted()
+            val gapMin = max(45 * 60_000L, (t1 - t0) / 30)
+            for (i in 1 until times.size) {
+                if (times[i] - times[i - 1] > gapMin) {
+                    val x1 = x(times[i - 1]); val x2 = x(times[i])
+                    c.drawRect(x1, top, x2, bottom, gapPaint)
+                    val label = "bez dat"
+                    val tw = axisText.measureText(label)
+                    if (x2 - x1 > tw + 6f * d) c.drawText(label, (x1 + x2 - tw) / 2, bottom - 6f * d, axisText)
+                }
+            }
+        }
 
         // mřížka a osa Y
         val steps = 4

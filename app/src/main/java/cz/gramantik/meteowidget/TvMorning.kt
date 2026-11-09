@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.TextView
 import cz.gramantik.meteowidget.ui.C
 import cz.gramantik.meteowidget.ui.WRAP
 import cz.gramantik.meteowidget.ui.dp
@@ -270,8 +271,13 @@ object TvMorning {
             val card = c.vbox().apply {
                 background = rounded(0xFF0C0F13.toInt(), c.dp(6).toFloat(), c.dp(1), (w.color and 0x00FFFFFF) or 0x88000000.toInt())
                 setPadding(c.dp(6), c.dp(3), c.dp(6), c.dp(3))
-                addView(c.text(w.title, 10.5f, w.color, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
-                if (w.sub.isNotEmpty()) addView(c.text(w.sub, 8.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                // dlouhý text roluje do strany
+                fun TextView.marquee() = apply {
+                    setSingleLine(); ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
+                    marqueeRepeatLimit = -1; isSelected = true
+                }
+                addView(c.text(w.title, 10.5f, w.color, bold = true).marquee())
+                if (w.sub.isNotEmpty()) addView(c.text(w.sub, 8.5f, C.DIM).marquee())
             }
             wl.addView(card, c.lp(bottom = 3))
         }

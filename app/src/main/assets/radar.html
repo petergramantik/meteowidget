@@ -43,6 +43,17 @@
   .leaflet-control-attribution { display: none; }
   .pin { width: 14px; height: 14px; border-radius: 7px; background: #ffd54f; border: 2px solid #060709; box-shadow: 0 0 0 2px #ffd54f; }
   .pin2 { width: 12px; height: 12px; border-radius: 6px; background: #3ddc97; border: 2px solid #060709; box-shadow: 0 0 0 2px #3ddc97; }
+  /* ---------- televize: ovládání lištou tlačítek ---------- */
+  body.tv #search, body.tv #slider, body.tv #layers, body.tv #opRow, body.tv .leaflet-control-zoom { display: none !important; }
+  body.tv #map { bottom: 92px; }
+  body.tv #panel { height: 92px; }
+  body.tv #legend { bottom: 100px; }
+  body.tv #play { display: none; }
+  #tvbar { display: none; gap: 8px; margin-top: 8px; }
+  body.tv #tvbar { display: flex; }
+  .tvb { flex: none; padding: 7px 14px; border-radius: 16px; font-size: 15px; border: 1px solid rgba(255,255,255,.25);
+         background: #171b21; color: #fff; white-space: nowrap; }
+  .tvb.f { background: #ffd54f; color: #060709; border-color: #ffd54f; font-weight: bold; }
   #legend { position: absolute; right: 10px; bottom: 170px; z-index: 1000; font-size: 11px; color: rgba(255,255,255,.75);
             background: rgba(16,19,23,.85); padding: 4px 8px; border-radius: 8px; display: none; }
 </style>
@@ -66,6 +77,7 @@
     <div id="time">--:--</div>
     <input id="slider" type="range" min="0" max="0" value="0">
   </div>
+  <div id="tvbar"></div>
   <div id="layers"></div>
   <div id="opRow"><span id="opName">Síla: Srážky</span><input id="op" type="range" min="10" max="100" step="5"><span id="opVal"></span></div>
   <div id="attr">Radar: <a href="https://www.rainviewer.com/">Weather data by RainViewer</a> ·
@@ -75,12 +87,17 @@
 
 <script>
   var lat = parseFloat('__LAT__'), lon = parseFloat('__LON__'), placeName = '__NAME__', owmKey = '__OWM__', mapyKey = '__MAPY__';
+  var isTv = '__TV__' === '1';
+  if (isTv) document.body.className = 'tv';
   var msg = document.getElementById('msg');
 
   if (typeof L === 'undefined') {
     msg.textContent = 'Mapu se nepodařilo načíst – zkontroluj připojení.';
   } else {
-    var map = L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 7);
+    var map = isTv
+      ? L.map('map', { zoomControl: false, attributionControl: false, keyboard: false, dragging: false,
+          scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, touchZoom: false }).setView([lat, lon], 8)
+      : L.map('map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 7);
 
     // ---------- podkladové mapy ----------
     var baseLayers = [], baseMode = null;
@@ -166,8 +183,13 @@
         (idx === frames.length - 1 ? ' (teď)' : '');
       slider.value = idx;
     }
-    function stop() { if (timer) { clearInterval(timer); timer = null; } playBtn.textContent = '▶'; }
-    function play() { stop(); playBtn.textContent = '❚❚'; timer = setInterval(function () { show(idx + 1); }, 600); }
+    function stop() { if (timer) { clearInterval(timer); timer = null; } playBtn.textContent = '▶'; if (window.drawTv) drawTv(); }
+    function play() {
+      stop(); playBtn.textContent = '❚❚';
+      // poslední snímek (teď) chvíli podržet
+      timer = setInterval(function () { show(idx + 1); }, 600);
+      if (window.drawTv) drawTv();
+    }
     playBtn.onclick = function () { timer ? stop() : play(); };
     slider.oninput = function () { stop(); show(parseInt(slider.value, 10)); };
 
@@ -183,6 +205,7 @@
           if (!frames.length) msg.textContent = 'Radarová data nejsou k dispozici.';
           stop();
           show(frames.length - 1);
+          if (isTv && frames.length) play(); // na TV se radar sám přehrává
         })
         .catch(function () { msg.style.display = 'block'; msg.textContent = 'Radar se nepodařilo načíst.'; });
     };
@@ -283,6 +306,68 @@
       map.setView([lat, lon], 7);
     };
     map.on('click', function () { res.style.display = 'none'; q.blur(); });
+
+    // ---------- televize: lišta tlačítek (šipky ← → výběr, OK potvrdit, ↑ ↓ odchod z mapy) ----------
+    if (isTv) {
+      var VIEWS = [
+        { name: 'Okolí', c: [lat, lon], z: 10 },
+        { name: 'Morava', c: [lat, lon], z: 8 },
+        { name: 'ČR', c: [49.8, 15.4], z: 7 },
+        { name: 'Evropa', c: [50.5, 13], z: 4 },
+      ];
+      var viewIdx = 1, tvSel = 0, tvFocused = false;
+      var tvLayers = ['radar'].concat(owmKey ? OWM.map(function (o) { return o.id; }) : []);
+      function setTvLayer(id) {
+        if (id === 'radar') { showRadar = true; setOverlay(null); show(idx); }
+        else { showRadar = false; show(idx); setOverlay(id); }
+      }
+      var baseNames = { sat: '🛰 Satelit', osm: '🗺 Běžná', dark: '🌙 Tmavá' };
+      var tvButtons = [
+        { t: function () { return timer ? '❚❚ Zastavit' : '▶ Přehrát'; }, a: function () { timer ? stop() : play(); } },
+        { t: function () { return '⏮'; }, a: function () { stop(); show(idx - 1); } },
+        { t: function () { return '⏭'; }, a: function () { stop(); show(idx + 1); } },
+        { t: function () { return '➖'; }, a: function () { map.setZoom(Math.max(4, map.getZoom() - 1)); } },
+        { t: function () { return '➕'; }, a: function () { map.setZoom(Math.min(12, map.getZoom() + 1)); } },
+        { t: function () { return '📍 ' + VIEWS[viewIdx].name; }, a: function () {
+            viewIdx = (viewIdx + 1) % VIEWS.length; map.setView(VIEWS[viewIdx].c, VIEWS[viewIdx].z); } },
+        { t: function () { return '🌧 ' + layerName(activeLayer()); }, a: function () {
+            if (tvLayers.length < 2) { alertMsg('Další vrstvy (oblačnost, teplota, vítr) potřebují klíč OpenWeatherMap.'); return; }
+            setTvLayer(tvLayers[(tvLayers.indexOf(activeLayer()) + 1) % tvLayers.length]); } },
+        { t: function () { return baseNames[baseMode] || 'Mapa'; }, a: function () {
+            var order = mapyKey ? ['sat', 'osm', 'dark'] : ['osm', 'dark'];
+            setBase(order[(order.indexOf(baseMode) + 1) % order.length]); } },
+      ];
+      var bar = document.getElementById('tvbar');
+      window.drawTv = function () {
+        bar.innerHTML = '';
+        tvButtons.forEach(function (b, i) {
+          var e = document.createElement('div');
+          e.className = 'tvb' + (tvFocused && i === tvSel ? ' f' : '');
+          e.textContent = b.t();
+          bar.appendChild(e);
+        });
+      };
+      var drawTv = window.drawTv;
+      var oldDraw = window.drawChips;
+      window.drawChips = function () { oldDraw(); drawTv(); };
+      drawChips = window.drawChips;
+      window.tvFocus = function (on) { tvFocused = on; drawTv(); };
+      document.addEventListener('keydown', function (e) {
+        var k = e.key;
+        if (k === 'ArrowLeft' || k === 'ArrowRight') {
+          tvSel = (tvSel + (k === 'ArrowRight' ? 1 : -1) + tvButtons.length) % tvButtons.length;
+          tvFocused = true; drawTv();
+        } else if (k === 'Enter' || k === ' ') {
+          tvFocused = true; tvButtons[tvSel].a(); drawTv();
+        } else if (k === 'ArrowUp' || k === 'ArrowDown') {
+          tvFocused = false; drawTv();
+          if (window.TvBridge) TvBridge.leave(k === 'ArrowUp' ? 'up' : 'down');
+        } else return;
+        e.preventDefault(); e.stopPropagation();
+      }, true);
+      map.on('zoomend', drawTv);
+      drawTv();
+    }
 
     reloadFrames();
     setInterval(window.reloadFrames, 5 * 60 * 1000);

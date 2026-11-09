@@ -60,7 +60,6 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
     private fun buildTomorrowLeft(left: LinearLayout, d: DayF?) {
         val c = ctx
         val tmr = LocalDate.now().plusDays(1)
-        left.addView(c.label("ZÍTRA · " + java.time.format.DateTimeFormatter.ofPattern("EEE d. M.", cz).format(tmr), C.ACCENT).apply { textSize = 9f })
         if (d == null) {
             left.addView(c.text("Předpověď zatím není k dispozici", 12f, C.DIM), c.lp(top = 8))
             return
@@ -74,7 +73,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             })
             addView(c.text(ForecastFull.describe(d.code), 11f, C.WHITE, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
         }, c.lp(0, WRAP, 1f, start = 8))
-        left.addView(top, c.lp(top = 2))
+        left.addView(top)
         fun line(s: String, color: Int = C.LABEL) =
             left.addView(c.text(s, 10.5f, color, condensed = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, c.lp(top = 3))
         line("Pocitově ${deg(d.feelsMax)} / ${deg(d.feelsMin)}", C.FEELS)
@@ -134,10 +133,11 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             buildTomorrowLeft(left, f?.days?.firstOrNull { it.date == today.plusDays(1) })
         } else {
         val lr = c.hbox(Gravity.TOP)
+        val hasSensors = w != null && listOf(Channel.S1, Channel.S2, Channel.S3).any { w.temp(it.tempCode) != null }
         fun col(name: String, temp: Double?, hum: Int?, color: Int, end: Boolean) = c.vbox(if (end) Gravity.END else Gravity.START).apply {
             addView(c.label(name))
-            addView(c.text(t(temp), 40f, color, condensed = true), c.lp(WRAP, WRAP, top = 2))
-            addView(c.text(Weather.h(hum), 17f, color, condensed = true))
+            addView(c.text(t(temp), if (hasSensors) 34f else 40f, color, condensed = true), c.lp(WRAP, WRAP, top = 2))
+            addView(c.text(Weather.h(hum), if (hasSensors) 15f else 17f, color, condensed = true))
         }
         lr.addView(col(p.channelName(Channel.IN), w?.tempIn, w?.humIn, C.IN, false), c.lp(0, WRAP, 1f))
         lr.addView(col(p.channelName(Channel.OUT), w?.tempOut, w?.humOut, C.OUT, true), c.lp(0, WRAP, 1f))
@@ -152,9 +152,11 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                 sensors.chunked(2).forEach { pair ->
                     val r = c.hbox(Gravity.TOP)
                     pair.forEachIndexed { i, (name, value) ->
-                        r.addView(c.vbox(if (i == 1) Gravity.END else Gravity.START).apply {
-                            addView(c.text(name, 8.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
-                            addView(c.text(value, 12f, C.SENSOR, condensed = true))
+                        r.addView(c.hbox().apply {
+                            gravity = (if (i == 1) Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
+                            addView(c.text(name, 9f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END },
+                                c.lp(WRAP, WRAP, end = 4).apply { weight = 0f })
+                            addView(c.text(value, 11f, C.SENSOR, condensed = true).apply { maxLines = 1 })
                         }, c.lp(0, WRAP, 1f))
                     }
                     if (pair.size == 1) r.addView(View(c), c.lp(0, 1, 1f))
@@ -170,17 +172,16 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         val mx = db.extreme("tout", start, now, true)
         if (mn != null && mx != null) {
             val tf = SimpleDateFormat("HH:mm", cz)
-            left.addView(c.text("venku dnes ↓ ${f1(mn.second)}° ${tf.format(Date(mn.first))}   ↑ ${f1(mx.second)}° ${tf.format(Date(mx.first))}", 10f, C.DIM), c.lp(top = 4))
+            left.addView(c.text("venku dnes ↓ ${f1(mn.second)}° ${tf.format(Date(mn.first))}   ↑ ${f1(mx.second)}° ${tf.format(Date(mx.first))}", 9f, C.DIM), c.lp(top = 3))
         }
-        Alerts.load(c).firstOrNull()?.let { al ->
+        if (!morning) Alerts.load(c).firstOrNull()?.let { al ->
             left.addView(c.text("⚠ ${al.event} · ${SimpleDateFormat("EEE HH:mm", cz).format(Date(al.onset))}–${SimpleDateFormat("HH:mm", cz).format(Date(al.expires))}", 10f, al.color, bold = true), c.lp(top = 3))
         }
         if (morning) {
             // ranní režim: dlaždice nahradí jeden řádek a svátek
             val sum = "💨 ${f1(w?.windAvg)} km/h · " +
                 (w?.pressure?.let { String.format(cz, "%.0f", it) } ?: "--") + " hPa$arrow · UV ${f1(w?.uv)}"
-            left.addView(c.text(sum, 10f, C.WIND, condensed = true), c.lp(top = 4))
-            left.addView(c.text("Svátek: ${NameDays.forDate(c, LocalDate.now())}", 10f, C.WHITE, bold = true), c.lp(top = 2))
+            left.addView(c.text(sum, 9.5f, C.WIND, condensed = true), c.lp(top = 2))
         }
         if (p.lastError != null) left.addView(c.text(friendlyError(p.lastError, p.lastUpdate) ?: "", 9f, C.ACCENT), c.lp(top = 3))
         }

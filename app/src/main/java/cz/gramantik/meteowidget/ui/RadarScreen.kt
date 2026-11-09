@@ -34,6 +34,25 @@ class RadarScreen(private val a: Activity) : MainActivity.Screen {
 
     override val view: View = web
 
+    private val tv = a.isTv()
+
+    init {
+        if (tv) {
+            // na TV ovládá mapu lišta tlačítek ve stránce; ↑ ↓ vrátí focus aplikaci
+            web.isFocusable = true
+            web.addJavascriptInterface(object {
+                @android.webkit.JavascriptInterface
+                fun leave(dir: String) {
+                    web.post {
+                        val next = web.focusSearch(if (dir == "up") View.FOCUS_UP else View.FOCUS_DOWN)
+                        next?.requestFocus()
+                    }
+                }
+            }, "TvBridge")
+            web.setOnFocusChangeListener { _, has -> web.evaluateJavascript("if (window.tvFocus) tvFocus($has);", null) }
+        }
+    }
+
     private var loadedKey = ""
     private fun key(p: Prefs) = p.owmKey + "|" + p.mapyKey + "|" + p.lat + "|" + p.lon
 
@@ -48,6 +67,7 @@ class RadarScreen(private val a: Activity) : MainActivity.Screen {
             .replace("__NAME__", p.locName.replace("'", ""))
             .replace("__OWM__", p.owmKey.replace("'", ""))
             .replace("__MAPY__", p.mapyKey.replace("'", ""))
+            .replace("__TV__", if (tv) "1" else "0")
         loadedKey = key(p)
         web.loadDataWithBaseURL("https://meteowidget.local/", html, "text/html", "utf-8", null)
     }

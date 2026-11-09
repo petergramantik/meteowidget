@@ -62,7 +62,8 @@ object Notify {
     }
 
     private fun canPost(ctx: Context) =
-        ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        android.os.Build.VERSION.SDK_INT < 33 ||
+            ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
     fun post(ctx: Context, id: Int, title: String, text: String) {
         if (!canPost(ctx)) return

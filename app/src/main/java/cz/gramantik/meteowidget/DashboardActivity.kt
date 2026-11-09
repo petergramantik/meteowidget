@@ -20,11 +20,30 @@ class DashboardActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // při spuštění budíkem rozsvítit obrazovku i z pohotovosti
+        if (android.os.Build.VERSION.SDK_INT >= 27) {
+            setTurnScreenOn(true)
+            setShowWhenLocked(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            )
+        }
+        TvSchedule.running = java.lang.ref.WeakReference(this)
+        TvSchedule.reschedule(this)
         panel = TvPanel(this)
         setContentView(panel.root)
-        window.insetsController?.let {
-            it.hide(WindowInsets.Type.systemBars())
-            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.systemBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
         }
         if (!Prefs(this).isConfigured) {
             show("Nejdřív zadej údaje z Tuya – otevírám nastavení")
@@ -43,6 +62,7 @@ class DashboardActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (TvSchedule.running?.get() === this) TvSchedule.running = null
         panel.release()
         super.onDestroy()
     }
@@ -50,6 +70,10 @@ class DashboardActivity : Activity() {
     private fun show(msg: String) {
         toast?.cancel()
         toast = Toast.makeText(this, msg, Toast.LENGTH_SHORT).also { it.show() }
+    }
+
+    companion object {
+        const val EXTRA_SCHEDULED = "scheduled"
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {

@@ -80,7 +80,9 @@ class MainActivity : Activity() {
         setContentView(root)
 
         FetchWorker.schedulePeriodic(this)
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         show(intent?.getIntExtra(EXTRA_TAB, 0) ?: 0)

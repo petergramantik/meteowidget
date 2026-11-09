@@ -519,6 +519,21 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
     private fun export(from: Long, to: Long) {
         val csv = MeteoDb.get(a).csv(from, to)
         val name = "meteostanice_" + SimpleDateFormat("yyyyMMdd_HHmm", cz).format(Date()) + ".csv"
+        if (android.os.Build.VERSION.SDK_INT < 29) {
+            // starší Android: do složky aplikace (Android/data/…/files/Download)
+            try {
+                val dir = a.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: a.filesDir
+                val f = java.io.File(dir, name)
+                f.outputStream().use { out ->
+                    out.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+                    out.write(csv.toByteArray())
+                }
+                Toast.makeText(a, "Uloženo: ${f.absolutePath}", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(a, "Export selhal: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
         try {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, name)

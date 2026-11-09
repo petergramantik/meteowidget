@@ -14,7 +14,10 @@ object Updater {
     private const val API = "https://api.github.com/repos/petergramantik/meteowidget/releases/latest"
 
     fun currentVersion(ctx: Context): Int =
-        ctx.packageManager.getPackageInfo(ctx.packageName, 0).longVersionCode.toInt()
+        ctx.packageManager.getPackageInfo(ctx.packageName, 0).let {
+            if (android.os.Build.VERSION.SDK_INT >= 28) it.longVersionCode.toInt()
+            else @Suppress("DEPRECATION") it.versionCode
+        }
 
     /** Zjistí poslední verzi na GitHubu a uloží ji. Vrací číslo verze nebo 0. */
     fun check(ctx: Context): Int {
@@ -139,7 +142,7 @@ object Updater {
             val intent = Intent(ctx, InstallReceiver::class.java)
             val pi = PendingIntent.getBroadcast(
                 ctx, sessionId, intent,
-                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                (if (android.os.Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0) or PendingIntent.FLAG_UPDATE_CURRENT
             )
             session.commit(pi.intentSender)
         }

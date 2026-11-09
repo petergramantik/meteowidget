@@ -195,6 +195,20 @@
             android:textIsSelectable="true"
             android:textSize="12sp" />
 
+        <TextView style="@style/Section" android:text="Televize – plánované spuštění" />
+
+        <CheckBox android:id="@+id/tv_start_on" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Každý den spustit panel v (HH:MM):" />
+        <EditText android:id="@+id/tv_start_time" style="@style/Field" android:inputType="time" />
+        <CheckBox android:id="@+id/tv_stop_on" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Každý den zavřít panel v (HH:MM):" />
+        <EditText android:id="@+id/tv_stop_time" style="@style/Field" android:inputType="time" />
+        <CheckBox android:id="@+id/tv_boot" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Spustit panel po zapnutí boxu" />
+        <TextView android:id="@+id/tv_overlay_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textSize="13sp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <Button android:id="@+id/tv_overlay_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Povolit spouštění" />
+            <Button android:id="@+id/tv_test_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Vyzkoušet za 2 minuty" />
+        </LinearLayout>
+        <TextView style="@style/Label" android:text="Televizi zapne box přes HDMI-CEC – na Samsungu zapni Anynet+ (HDMI-CEC), na boxu ovládání HDMI-CEC." />
+
         <TextView style="@style/Section" android:text="Televize – jas a noční režim" />
 
         <TextView

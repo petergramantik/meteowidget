@@ -21,6 +21,7 @@ class SettingsActivity : Activity() {
     private lateinit var updateStatus: TextView
     private lateinit var updateButton: Button
     private val numFields = ArrayList<Pair<EditText, (Float) -> Unit>>()
+    private var scheduleSaver: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -164,6 +165,41 @@ class SettingsActivity : Activity() {
             }.start()
         }
 
+        // ---------- televize: plánované spuštění ----------
+        val tvStartOn = findViewById<CheckBox>(R.id.tv_start_on)
+        val tvStart = findViewById<EditText>(R.id.tv_start_time)
+        val tvStopOn = findViewById<CheckBox>(R.id.tv_stop_on)
+        val tvStop = findViewById<EditText>(R.id.tv_stop_time)
+        val tvBoot = findViewById<CheckBox>(R.id.tv_boot)
+        tvStartOn.isChecked = TvSchedule.startEnabled(this)
+        tvStart.setText(TvSchedule.startTime(this))
+        tvStopOn.isChecked = TvSchedule.stopEnabled(this)
+        tvStop.setText(TvSchedule.stopTime(this))
+        tvBoot.isChecked = TvSchedule.bootStart(this)
+        val saveSchedule = {
+            TvSchedule.save(
+                this, tvStartOn.isChecked, tvStart.text.toString(),
+                tvStopOn.isChecked, tvStop.text.toString(), tvBoot.isChecked
+            )
+        }
+        scheduleSaver = saveSchedule
+        listOf(tvStartOn, tvStopOn, tvBoot).forEach { it.setOnCheckedChangeListener { _, _ -> saveSchedule() } }
+        listOf(tvStart, tvStop).forEach { e -> e.setOnFocusChangeListener { _, has -> if (!has) saveSchedule() } }
+        findViewById<Button>(R.id.tv_overlay_btn).setOnClickListener {
+            if (!TvSchedule.requestOverlay(this)) {
+                findViewById<TextView>(R.id.tv_overlay_status).text =
+                    "⚠ Box nenabízí obrazovku povolení. Najdi v Nastavení → Aplikace → Zvláštní přístup → " +
+                        "Zobrazovat přes jiné aplikace → Meteostanice."
+            }
+        }
+        findViewById<Button>(R.id.tv_test_btn).setOnClickListener {
+            saveSchedule()
+            TvSchedule.testIn2Minutes(this)
+            android.widget.Toast.makeText(
+                this, "Za 2 minuty se spustí panel. Teď vypni box ovladačem do pohotovosti.", android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+
         // ---------- televize ----------
         val tv = TvPrefs(this)
         val dayLabel = findViewById<TextView>(R.id.tv_day_label)
@@ -226,6 +262,7 @@ class SettingsActivity : Activity() {
             lat.text.toString().replace(',', '.').toDoubleOrNull()?.let { prefs.lat = it }
             lon.text.toString().replace(',', '.').toDoubleOrNull()?.let { prefs.lon = it }
             numFields.forEach { (e, set) -> e.text.toString().replace(',', '.').toFloatOrNull()?.let(set) }
+            scheduleSaver?.invoke()
             Alerts.setRegion(this, region.text.toString())
             prefs.owmKey = owm.text.toString()
             prefs.mapyKey = mapy.text.toString()
@@ -400,6 +437,9 @@ class SettingsActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        findViewById<TextView>(R.id.tv_overlay_status)?.text =
+            if (TvSchedule.canDrawOverlays(this)) "Spouštění z pozadí: ✅ povoleno"
+            else "Spouštění z pozadí: ⚠ není povoleno – bez něj se panel sám nespustí (Povolit spouštění)"
         findViewById<TextView>(R.id.battery_status)?.text =
             if (Battery.isUnrestricted(this)) "Sběr na pozadí: ✅ bez omezení baterie"
             else "Sběr na pozadí: ⚠ omezeno optimalizací baterie – v noci mohou chybět data. " +

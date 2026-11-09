@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "cz.gramantik.meteowidget"
-        minSdk = 31
+        minSdk = 26
         targetSdk = 35
         versionCode = buildNumber
         versionName = "1.$buildNumber"

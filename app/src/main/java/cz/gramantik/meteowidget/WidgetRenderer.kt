@@ -26,7 +26,7 @@ object WidgetRenderer {
     fun updateAll(ctx: Context, refreshing: Boolean = false) {
         val mgr = AppWidgetManager.getInstance(ctx)
         val s = State(ctx, refreshing)
-        for (id in ids(ctx, MeteoWidgetProvider::class.java)) mgr.updateAppWidget(id, buildMain(ctx, s))
+        for (id in ids(ctx, MeteoWidgetProvider::class.java)) mgr.updateAppWidget(id, buildMain(ctx, s, id))
         for (id in ids(ctx, MiniWidgetProvider::class.java)) mgr.updateAppWidget(id, buildMini(ctx, s, id))
     }
 
@@ -85,15 +85,28 @@ object WidgetRenderer {
     }
 
     // ---------- velký widget ----------
-    private fun buildMain(ctx: Context, s: State): RemoteViews =
-        RemoteViews(
-            mapOf(
-                SizeF(110f, 70f) to buildSmall(ctx, s),
-                SizeF(250f, 200f) to buildFull(ctx, s, withForecast = false, withGraph = false),
-                SizeF(300f, 320f) to buildFull(ctx, s, withForecast = true, withGraph = false),
-                SizeF(300f, 410f) to buildFull(ctx, s, withForecast = true, withGraph = true),
+    private fun buildMain(ctx: Context, s: State, id: Int): RemoteViews {
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            return RemoteViews(
+                mapOf(
+                    SizeF(110f, 70f) to buildSmall(ctx, s),
+                    SizeF(250f, 200f) to buildFull(ctx, s, withForecast = false, withGraph = false),
+                    SizeF(300f, 320f) to buildFull(ctx, s, withForecast = true, withGraph = false),
+                    SizeF(300f, 410f) to buildFull(ctx, s, withForecast = true, withGraph = true),
+                )
             )
-        )
+        }
+        // starší Android: rozložení podle velikosti z možností widgetu
+        val o = AppWidgetManager.getInstance(ctx).getAppWidgetOptions(id)
+        val w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 300)
+        val h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 410)
+        return when {
+            w < 250 || h < 200 -> buildSmall(ctx, s)
+            h < 320 -> buildFull(ctx, s, withForecast = false, withGraph = false)
+            h < 410 -> buildFull(ctx, s, withForecast = true, withGraph = false)
+            else -> buildFull(ctx, s, withForecast = true, withGraph = true)
+        }
+    }
 
     private fun header(ctx: Context, v: RemoteViews, s: State) {
         v.setOnClickPendingIntent(R.id.root, appIntent(ctx))

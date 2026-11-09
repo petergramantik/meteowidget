@@ -64,6 +64,7 @@ class MainActivity : Activity() {
         bar.addView(title, lp(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         refreshBtn = barButton(R.drawable.ic_refresh) { refreshData() }
         bar.addView(refreshBtn)
+        if (isTv()) bar.addView(barButton(R.drawable.ic_tv) { backToTvPanel() })
         bar.addView(barButton(R.drawable.ic_settings) { startActivity(Intent(this, SettingsActivity::class.java)) })
         root.addView(bar)
 
@@ -198,6 +199,21 @@ class MainActivity : Activity() {
             // nebyl registrován
         }
         super.onPause()
+    }
+
+    /** Zpět na televizní panel (i když ho systém mezitím zavřel). */
+    private fun backToTvPanel() {
+        startActivity(Intent(this, DashboardActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        finish()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (isTv()) backToTvPanel()
+        else {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+        }
     }
 
     override fun onDestroy() {

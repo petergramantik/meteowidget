@@ -33,12 +33,16 @@ import kotlin.math.roundToInt
 class TvHome(private val ctx: Context, private val interactive: Boolean) {
 
     companion object {
-        val TABS = listOf("Přehled", "Historie", "Předpověď", "Radar", "⚙ Nastavení")
+        val TABS = listOf("Dnes", "Zítra", "Předpověď", "Radar", "Historie", "⚙ Nastavení")
+        const val TAB_TODAY = 0
+        const val TAB_TOMORROW = 1
     }
 
     private val cz = Locale("cs", "CZ")
     val tabViews = ArrayList<TextView>()
     var onTab: ((Int) -> Unit)? = null
+    /** pohled na zítřek (záložka Zítra) */
+    var tomorrow = false
     /** animovaná ikona „teď“ se drží mezi překresleními (aby se animace nerestartovala) */
     private var animKey: String? = null
     private var animView: View? = null
@@ -50,6 +54,35 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
     private fun panel(): LinearLayout = ctx.vbox().apply {
         background = rounded(C.CARD, ctx.dp(10).toFloat(), ctx.dp(1), C.LINE)
         setPadding(ctx.dp(10), ctx.dp(7), ctx.dp(10), ctx.dp(7))
+    }
+
+    /** Levý panel v pohledu Zítra: očekávané počasí. */
+    private fun buildTomorrowLeft(left: LinearLayout, d: DayF?) {
+        val c = ctx
+        val tmr = LocalDate.now().plusDays(1)
+        left.addView(c.label("ZÍTRA · " + java.time.format.DateTimeFormatter.ofPattern("EEE d. M.", cz).format(tmr), C.ACCENT).apply { textSize = 9f })
+        if (d == null) {
+            left.addView(c.text("Předpověď zatím není k dispozici", 12f, C.DIM), c.lp(top = 8))
+            return
+        }
+        val top = c.hbox()
+        top.addView(c.icon(d.icon, 50))
+        top.addView(c.vbox().apply {
+            addView(c.hbox(Gravity.BOTTOM).apply {
+                addView(c.text(deg(d.tMax), 34f, C.IN, condensed = true))
+                addView(c.text("  ${deg(d.tMin)}", 18f, 0xFF8FB3FF.toInt(), condensed = true))
+            })
+            addView(c.text(ForecastFull.describe(d.code), 11f, C.WHITE, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+        }, c.lp(0, WRAP, 1f, start = 8))
+        left.addView(top, c.lp(top = 2))
+        fun line(s: String, color: Int = C.LABEL) =
+            left.addView(c.text(s, 10.5f, color, condensed = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, c.lp(top = 3))
+        line("Pocitově ${deg(d.feelsMax)} / ${deg(d.feelsMin)}", C.FEELS)
+        line("💨 vítr až ${d.windMax.roundToInt()} km/h · nárazy ${d.gustMax.roundToInt()} · ${ForecastFull.windDir(d.dir)}", C.WIND)
+        line("☔ srážky ${f1(d.precip)} mm · ${d.prob} %" + (if (d.snow >= 0.1) " · sníh ${f1(d.snow)} cm" else ""), C.RAIN)
+        line("UV max ${f1(d.uvMax)} · slunce ${f1(d.sunshineH)} h", C.UV)
+        val tf = java.time.format.DateTimeFormatter.ofPattern("H:mm")
+        line("🌅 ${d.sunrise?.let { tf.format(it) } ?: "--"}   🌇 ${d.sunset?.let { tf.format(it) } ?: "--"}   ·  svátek: ${NameDays.forDate(c, tmr)}", C.LIGHT)
     }
 
     fun build(animated: Boolean): View {
@@ -67,17 +100,16 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         tabViews.clear()
         if (interactive) {
             TABS.forEachIndexed { i, name ->
-                val tv = c.text(name, 11f, if (i == 0) C.BG else C.WHITE, bold = true).apply {
+                val tv = c.text(name, 11f, C.WHITE, bold = true).apply {
                     setPadding(c.dp(10), c.dp(4), c.dp(10), c.dp(4))
-                    background = rounded(if (i == 0) C.ACCENT else C.CARD2, c.dp(12).toFloat(), c.dp(1), C.LINE)
+                    background = rounded(C.CARD2, c.dp(12).toFloat(), c.dp(1), C.LINE)
                     isFocusable = true
                     isClickable = true
                     setOnClickListener { onTab?.invoke(i) }
+                    // vybraná záložka: jen žlutá výplň (bez rámečku a zvětšení)
                     setOnFocusChangeListener { v, has ->
-                        (v.background as? android.graphics.drawable.GradientDrawable)
-                            ?.setStroke(c.dp(if (has) 2 else 1), if (has) Color.WHITE else C.LINE)
-                        v.scaleX = if (has) 1.08f else 1f
-                        v.scaleY = if (has) 1.08f else 1f
+                        (v as TextView).setTextColor(if (has) C.BG else C.WHITE)
+                        v.background = rounded(if (has) C.ACCENT else C.CARD2, c.dp(12).toFloat(), c.dp(1), if (has) C.ACCENT else C.LINE)
                     }
                 }
                 tabViews.add(tv)
@@ -92,23 +124,42 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         val row = c.hbox(Gravity.TOP)
 
         // vlevo: Doma / Venku
+        val trend = PressureHistory.trend3h(c)
+        val arrow = when { trend == null -> ""; trend >= 1 -> " ↗"; trend <= -1 -> " ↘"; else -> " →" }
+        val morning = MorningPrefs(c).active()
         val left = panel()
+        val today = LocalDate.now()
+        val f = ForecastFull.load(c)
+        if (tomorrow) {
+            buildTomorrowLeft(left, f?.days?.firstOrNull { it.date == today.plusDays(1) })
+        } else {
         val lr = c.hbox(Gravity.TOP)
-        fun col(name: String, temp: Double?, hum: Int?, color: Int) = c.vbox().apply {
+        fun col(name: String, temp: Double?, hum: Int?, color: Int, end: Boolean) = c.vbox(if (end) Gravity.END else Gravity.START).apply {
             addView(c.label(name))
             addView(c.text(t(temp), 40f, color, condensed = true), c.lp(WRAP, WRAP, top = 2))
             addView(c.text(Weather.h(hum), 17f, color, condensed = true))
         }
-        lr.addView(col(p.channelName(Channel.IN), w?.tempIn, w?.humIn, C.IN), c.lp(0, WRAP, 1f))
-        lr.addView(col(p.channelName(Channel.OUT), w?.tempOut, w?.humOut, C.OUT), c.lp(0, WRAP, 1f))
+        lr.addView(col(p.channelName(Channel.IN), w?.tempIn, w?.humIn, C.IN, false), c.lp(0, WRAP, 1f))
+        lr.addView(col(p.channelName(Channel.OUT), w?.tempOut, w?.humOut, C.OUT, true), c.lp(0, WRAP, 1f))
         left.addView(lr)
         if (w != null) {
             val sensors = listOf(Channel.S1, Channel.S2, Channel.S3).mapNotNull { ch ->
-                w.temp(ch.tempCode)?.let { "${p.channelName(ch)}  ${t(it)} · ${Weather.h(w.hum(ch.humCode))}" }
+                w.temp(ch.tempCode)?.let { p.channelName(ch) to "${t(it)} · ${Weather.h(w.hum(ch.humCode))}" }
             }
             if (sensors.isNotEmpty()) {
-                left.addView(View(c).apply { setBackgroundColor(C.LINE) }, c.lp(h = 1, top = 5, bottom = 4))
-                sensors.forEach { left.addView(c.text(it, 13f, C.SENSOR, condensed = true)) }
+                left.addView(View(c).apply { setBackgroundColor(C.LINE) }, c.lp(h = 1, top = 5, bottom = 3))
+                // další čidla ve dvou sloupcích
+                sensors.chunked(2).forEach { pair ->
+                    val r = c.hbox(Gravity.TOP)
+                    pair.forEachIndexed { i, (name, value) ->
+                        r.addView(c.vbox(if (i == 1) Gravity.END else Gravity.START).apply {
+                            addView(c.text(name, 8.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                            addView(c.text(value, 12f, C.SENSOR, condensed = true))
+                        }, c.lp(0, WRAP, 1f))
+                    }
+                    if (pair.size == 1) r.addView(View(c), c.lp(0, 1, 1f))
+                    left.addView(r, c.lp(bottom = 2))
+                }
             }
         }
         // dnešní min/max venku
@@ -124,9 +175,6 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         Alerts.load(c).firstOrNull()?.let { al ->
             left.addView(c.text("⚠ ${al.event} · ${SimpleDateFormat("EEE HH:mm", cz).format(Date(al.onset))}–${SimpleDateFormat("HH:mm", cz).format(Date(al.expires))}", 10f, al.color, bold = true), c.lp(top = 3))
         }
-        val trend = PressureHistory.trend3h(c)
-        val arrow = when { trend == null -> ""; trend >= 1 -> " ↗"; trend <= -1 -> " ↘"; else -> " →" }
-        val morning = MorningPrefs(c).active()
         if (morning) {
             // ranní režim: dlaždice nahradí jeden řádek a svátek
             val sum = "💨 ${f1(w?.windAvg)} km/h · " +
@@ -135,12 +183,13 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             left.addView(c.text("Svátek: ${NameDays.forDate(c, LocalDate.now())}", 10f, C.WHITE, bold = true), c.lp(top = 2))
         }
         if (p.lastError != null) left.addView(c.text(friendlyError(p.lastError, p.lastUpdate) ?: "", 9f, C.ACCENT), c.lp(top = 3))
+        }
         row.addView(left, c.lp(c.dp(255), c.dp(168), end = 8))
-        val f = ForecastFull.load(c)
         val nowHour = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0)
         val hours = f?.hours?.filter { !it.time.isBefore(nowHour) } ?: emptyList()
-        val today = LocalDate.now()
-        if (morning) {
+        if (tomorrow) {
+            row.addView(TvMorning.build(c, 168, today.plusDays(1)))
+        } else if (morning) {
             row.addView(TvMorning.build(c, 168))
         } else {
 
@@ -216,14 +265,18 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         val bottom = panel()
         val br = c.hbox(Gravity.TOP)
         val hcol = c.vbox()
-        hcol.addView(c.label("PŘÍŠTÍCH 12 HODIN", C.BARO).apply { textSize = 9f })
+        val tmr = today.plusDays(1)
+        val shownHours = if (tomorrow) f?.hours?.filter { it.time.toLocalDate() == tmr && it.time.hour in 6..21 } ?: emptyList()
+            else hours.take(12)
+        hcol.addView(c.label(if (tomorrow) "ZÍTRA 6–21 H" else "PŘÍŠTÍCH 12 HODIN", C.BARO).apply { textSize = 9f })
         val hr = c.hbox(Gravity.TOP)
-        hours.take(12).forEach { h ->
+        shownHours.forEach { h ->
             hr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
-                addView(c.text("${h.time.hour}:00", 9f, C.LABEL))
-                addView(c.icon(h.icon, 24), c.lp(WRAP, WRAP, top = 1))
-                addView(c.text(deg(h.temp), 12f, C.WHITE, condensed = true))
-                addView(c.text(if (h.precip >= 0.1) f1(h.precip) else " ", 8f, C.RAIN))
+                // zítra 16 hodin – užší buňky
+                addView(c.text(if (tomorrow) "${h.time.hour}" else "${h.time.hour}:00", 9f, C.LABEL))
+                addView(c.icon(h.icon, if (tomorrow) 17 else 24), c.lp(WRAP, WRAP, top = 1))
+                addView(c.text(deg(h.temp), if (tomorrow) 10f else 12f, C.WHITE, condensed = true))
+                addView(c.text(if (h.precip >= 0.1) f1(h.precip) else " ", if (tomorrow) 7f else 8f, C.RAIN))
             }, c.lp(0, WRAP, 1f))
         }
         hcol.addView(hr, c.lp(top = 4))
@@ -249,7 +302,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         br.addView(dcol, c.lp(0, WRAP, 1f))
         bottom.addView(br)
         if (interactive) {
-            bottom.addView(c.text((if (MorningPrefs(c).scheduled()) "← → záložky · OK otevřít (na Přehledu: ranní / běžný pohled) · ↑ ↓ jas · Menu = nastavení" else "← → záložky · OK otevřít · ↑ ↓ jas · Menu = nastavení"), 8f, 0x66FFFFFF), c.lp(top = 2))
+            bottom.addView(c.text((if (MorningPrefs(c).scheduled()) "← → záložky (Dnes / Zítra se přepnou hned) · OK otevřít, na Dnes ranní / běžný pohled · ↑ ↓ jas" else "← → záložky (Dnes / Zítra se přepnou hned) · OK otevřít · ↑ ↓ jas · Menu = nastavení"), 8f, 0x66FFFFFF), c.lp(top = 2))
         }
         root.addView(bottom, c.lp(h = 0, weight = 1f, top = 8))
         return root

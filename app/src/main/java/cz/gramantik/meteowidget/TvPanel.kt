@@ -100,9 +100,16 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
         handler.postDelayed({ root.removeView(hint) }, 6_000)
     }
 
+    /** poslední stisk ovladače – po 5 min bez ovládání se Zítra vrátí na Dnes */
+    var lastInput = System.currentTimeMillis()
+
     private val tick = object : Runnable {
         override fun run() {
             if (!running) return
+            if (home.tomorrow && System.currentTimeMillis() - lastInput > 5 * 60_000) {
+                home.tomorrow = false
+                focusedTab = TvHome.TAB_TODAY
+            }
             maybeSync()
             render()
             handler.postDelayed(this, 60_000)

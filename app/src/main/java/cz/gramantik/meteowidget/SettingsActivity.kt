@@ -329,7 +329,7 @@ class SettingsActivity : Activity() {
                 for (i in 0 until v.childCount) walk(v.getChildAt(i))
             }
             if (v is EditText || v is Button || v is CheckBox || v is Spinner || v is SeekBar) {
-                v.tvFocus(scale = if (v is EditText || v is SeekBar || v is Spinner) 1.0f else 1.04f)
+                v.tvFocus(scale = if (v is EditText || v is SeekBar || v is Spinner) 1.0f else 1.04f, light = true)
             }
         }
         walk(window.decorView)
@@ -420,7 +420,7 @@ class SettingsActivity : Activity() {
                 addView(st)
                 setOnClickListener { showSection(sec.id) }
             }
-            row.tvFocus(restoreStroke = 0x33888888, scale = 1.02f)
+            row.tvFocus(restoreStroke = 0x33888888, scale = 1.0f, light = true)
             box.addView(row, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = (8 * d).toInt() })
             menuRows.add(row)
             menuStatus.add(st)

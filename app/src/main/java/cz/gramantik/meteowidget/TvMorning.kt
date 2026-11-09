@@ -33,7 +33,7 @@ class MorningPrefs(ctx: Context) {
         const val MORNING = 1
         const val ALL_DAY = 2
 
-        /** OK na Přehledu přepne na běžný pohled – platí do konce okna (jen v paměti). */
+        /** OK na záložce Dnes přepne na běžný pohled – platí do konce okna (jen v paměti). */
         @Volatile var dismissedUntil = 0L
 
         fun parse(s: String): LocalTime? = try {
@@ -207,12 +207,12 @@ object TvMorning {
      * Ranní panel (místo dlaždic a panelu Dnes).
      * @param width šířka v dp, [height] výška v dp
      */
-    fun build(ctx: Context, height: Int): View {
+    fun build(ctx: Context, height: Int, forDay: LocalDate? = null): View {
         val c = ctx
         val mp = MorningPrefs(c)
         val now = LocalDateTime.now()
         val today = now.toLocalDate()
-        val day = targetDay(now)
+        val day = forDay ?: targetDay(now)
         val tomorrow = day != today
         val f = ForecastFull.load(c)
         val dayF = f?.days?.firstOrNull { it.date == day }
@@ -221,15 +221,20 @@ object TvMorning {
             background = rounded(0xFF12171D.toInt(), c.dp(10).toFloat(), c.dp(1), 0x55FFD54F)
             setPadding(c.dp(12), c.dp(7), c.dp(12), c.dp(7))
         }
-        val (greet, emoji) = mp.greeting(now.toLocalTime())
-        val title = if (mp.names.isBlank()) "$greet $emoji" else "$greet, ${mp.names} $emoji"
+        val dateFmt = java.time.format.DateTimeFormatter.ofPattern("EEEE d. MMMM", cz)
+        val title = if (forDay != null) {
+            (if (forDay == today.plusDays(1)) "Zítra, " else "") + dateFmt.format(forDay)
+        } else {
+            val (greet, emoji) = mp.greeting(now.toLocalTime())
+            if (mp.names.isBlank()) "$greet $emoji" else "$greet, ${mp.names} $emoji"
+        }
         box.addView(c.text(title, 17f, C.ACCENT, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
-        val dateTxt = java.time.format.DateTimeFormatter.ofPattern("EEEE d. MMMM", cz).format(today)
+        val subDay = forDay ?: today
         val sub = buildString {
-            append(dateTxt)
-            append(" · svátek má ").append(NameDays.forDate(c, today))
+            if (forDay == null) append(dateFmt.format(today)).append(" · ")
+            append("svátek má ").append(NameDays.forDate(c, subDay))
             dayF?.let {
-                append(if (tomorrow) " · zítra " else " · ")
+                append(if (tomorrow && forDay == null) " · zítra " else " · ")
                 append("${deg(it.tMax)} / ${deg(it.tMin)}, ")
                 append(ForecastFull.describe(it.code).lowercase(cz))
             }

@@ -160,7 +160,7 @@ fun Context.grid(tiles: List<View>, cols: Int = 2): LinearLayout = vbox().apply 
  * Výrazné zvýraznění prvku vybraného ovladačem (TV): bílý rámeček / žlutý podklad a mírné zvětšení.
  * Zachová případný dřívější posluchač focusu.
  */
-fun View.tvFocus(restoreStroke: Int = C.LINE, scale: Float = 1.05f): View {
+fun View.tvFocus(restoreStroke: Int = C.LINE, scale: Float = 1.05f, light: Boolean = false): View {
     isFocusable = true
     val d = resources.displayMetrics.density
     val origBg = background
@@ -171,13 +171,21 @@ fun View.tvFocus(restoreStroke: Int = C.LINE, scale: Float = 1.05f): View {
         v.scaleY = if (has) scale else 1f
         val bg = v.background
         when {
+            // světlé pozadí (nastavení): tenká tmavě šedá linka
+            bg is GradientDrawable && light -> bg.setStroke(((if (has) 2 else 1) * d).toInt(), if (has) 0xFF505050.toInt() else restoreStroke)
             bg is GradientDrawable -> bg.setStroke(((if (has) 3 else 1) * d).toInt(), if (has) Color.WHITE else restoreStroke)
             has -> v.background = android.graphics.drawable.LayerDrawable(
                 arrayOf(
                     origBg ?: android.graphics.drawable.ColorDrawable(0),
                     GradientDrawable().apply {
-                        setColor(0x40FFC107); cornerRadius = 6 * d
-                        setStroke((3 * d).toInt(), 0xFFFFC107.toInt())
+                        cornerRadius = 6 * d
+                        if (light) {
+                            setColor(0x14000000)
+                            setStroke((2 * d).toInt(), 0xFF505050.toInt())
+                        } else {
+                            setColor(0x40FFC107)
+                            setStroke((3 * d).toInt(), 0xFFFFC107.toInt())
+                        }
                     }
                 )
             )

@@ -277,7 +277,7 @@
         <!-- ranní režim – doplní kód -->
         <LinearLayout android:id="@+id/tv_morning_box" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
         <TextView style="@style/Section" android:text="Televize – ranní režim" />
-        <TextView style="@style/Label" android:text="Místo dlaždic a panelu Dnes ukáže pozdrav, dnešní kalendář a na co si dát pozor. Po 18:00 se kalendář i upozornění přepnou na zítřek. OK na záložce Přehled přepne na běžný pohled a zpět." />
+        <TextView style="@style/Label" android:text="Místo dlaždic a panelu Dnes ukáže pozdrav, dnešní kalendář a na co si dát pozor. Po 18:00 se kalendář i upozornění přepnou na zítřek. OK na záložce Dnes přepne na běžný pohled a zpět." />
         <TextView style="@style/Label" android:text="Režim" />
         <Spinner android:id="@+id/tm_mode" android:layout_width="match_parent" android:layout_height="wrap_content" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">

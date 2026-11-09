@@ -36,7 +36,7 @@ class DashboardActivity : Activity() {
         panel = TvPanel(this, interactive = true)
         panel.home.onTab = { openTab(it) }
         setContentView(panel.root)
-        panel.showHint("← → záložky  ·  OK otevřít  ·  ↑ ↓ jas")
+        panel.showHint("← → záložky (Dnes / Zítra hned)  ·  OK otevřít  ·  ↑ ↓ jas")
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             window.insetsController?.let {
                 it.hide(WindowInsets.Type.systemBars())
@@ -80,23 +80,25 @@ class DashboardActivity : Activity() {
 
     private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java))
 
-    /** Záložky: 0 Přehled, 1 Historie, 2 Předpověď, 3 Radar, 4 Nastavení. */
+    /** Záložky: 0 Dnes, 1 Zítra, 2 Předpověď, 3 Radar, 4 Historie, 5 Nastavení. */
     private fun openTab(i: Int) {
         when (i) {
-            0 -> {
+            TvHome.TAB_TODAY -> {
                 // ranní režim: OK přepne ranní ↔ běžný pohled
-                if (MorningPrefs(this).toggle()) panel.render() else panel.refreshNow()
+                if (!panel.home.tomorrow && MorningPrefs(this).toggle()) panel.render() else panel.refreshNow()
             }
-            1, 2, 3 -> startActivity(
-                Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, i - 1)
-            )
-            4 -> openSettings()
+            TvHome.TAB_TOMORROW -> panel.refreshNow()
+            2 -> startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, 1))
+            3 -> startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, 2))
+            4 -> startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, 0))
+            5 -> openSettings()
         }
     }
 
     /** Ovládání ovladačem zachycené na úrovni okna. */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+        panel.lastInput = System.currentTimeMillis()
         val tabs = panel.home.tabViews
         when (event.keyCode) {
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> { openSettings(); return true }
@@ -111,6 +113,16 @@ class DashboardActivity : Activity() {
                 val next = (cur + if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1).coerceIn(0, tabs.size - 1)
                 tabs[next].requestFocus()
                 panel.focusedTab = next
+                // Dnes / Zítra se přepnou hned, bez OK
+                val wantTomorrow = when (next) {
+                    TvHome.TAB_TODAY -> false
+                    TvHome.TAB_TOMORROW -> true
+                    else -> panel.home.tomorrow
+                }
+                if (wantTomorrow != panel.home.tomorrow) {
+                    panel.home.tomorrow = wantTomorrow
+                    panel.render()
+                }
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,

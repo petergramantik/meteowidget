@@ -27,6 +27,8 @@ class SettingsActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
         prefs = Prefs(this)
+        setupTvFocus()
+        setupTransfer()
 
         // ---------- aktualizace ----------
         updateStatus = findViewById(R.id.update_status)
@@ -145,24 +147,12 @@ class SettingsActivity : Activity() {
         // ---------- historie ----------
         val backfillResult = findViewById<TextView>(R.id.backfill_result)
         backfillResult.text = backfillStats()
-        findViewById<Button>(R.id.backfill).setOnClickListener { btn ->
+        findViewById<Button>(R.id.backfill).setOnClickListener {
             if (!prefs.isConfigured) {
                 backfillResult.text = "Nejdřív vyplň údaje z Tuya."
                 return@setOnClickListener
             }
-            btn.isEnabled = false
-            backfillResult.text = "Stahuji historii z Tuya… (kvůli limitům Tuya může trvat několik minut)"
-            Thread {
-                val n = try {
-                    HistoryBackfill.run(this, prefs, TuyaClient(prefs))
-                } catch (e: Exception) {
-                    -1
-                }
-                runOnUiThread {
-                    btn.isEnabled = true
-                    backfillResult.text = (if (n >= 0) "Doplněno nebo rozšířeno $n záznamů.\n\n" else "Doplnění selhalo.\n\n") + backfillStats()
-                }
-            }.start()
+            startBackgroundBackfill(restart = true)
         }
 
         // ---------- televize: plánované spuštění ----------
@@ -274,7 +264,8 @@ class SettingsActivity : Activity() {
             button.isEnabled = false
             result.text = "Připojuji se…"
             Thread {
-                Sync.run(this, forceForecast = true)
+                // rychlý test bez doplňování historie
+                Sync.run(this, forceForecast = true, heavy = false)
                 FetchWorker.schedulePeriodic(this)
                 testKeys()
                 val text = report()
@@ -283,8 +274,117 @@ class SettingsActivity : Activity() {
                     button.isEnabled = true
                     showKeyStatus()
                 }
+                // historie se doplní odděleně na pozadí (s průběhem v sekci Historie)
+                if (prefs.isConfigured && prefs.lastError == null) startBackgroundBackfill(restart = false)
             }.start()
         }
+    }
+
+    // ---------- ovládání ovladačem (TV) ----------
+    /** Žlutý rámeček u vybraného prvku; ikonky 👁 se při procházení přeskočí. */
+    private fun setupTvFocus() {
+        listOf(R.id.eye_secret, R.id.eye_mapy, R.id.eye_owm, R.id.eye_google).forEach {
+            findViewById<View>(it)?.isFocusable = false
+        }
+        fun walk(v: View) {
+            if (v is android.view.ViewGroup) {
+                for (i in 0 until v.childCount) walk(v.getChildAt(i))
+            }
+            if (v.isFocusable && android.os.Build.VERSION.SDK_INT >= 23 &&
+                (v is EditText || v is Button || v is CheckBox || v is Spinner || v is SeekBar)
+            ) {
+                v.foreground = getDrawable(R.drawable.focus_frame)
+            }
+        }
+        walk(window.decorView)
+    }
+
+    // ---------- přenos nastavení telefon -> box ----------
+    private fun setupTransfer() {
+        findViewById<Button>(R.id.send_cfg).setOnClickListener {
+            val status = TextView(this).apply { textSize = 15f; setPadding(48, 24, 48, 0) }
+            val dlg = android.app.AlertDialog.Builder(this)
+                .setTitle("Poslat nastavení do TV")
+                .setView(status)
+                .setNegativeButton("Zavřít") { _, _ -> ConfigTransfer.stopSending() }
+                .setOnCancelListener { ConfigTransfer.stopSending() }
+                .create()
+            val code = try {
+                ConfigTransfer.startSending(this) { ok ->
+                    runOnUiThread {
+                        status.text = if (ok) "✅ Nastavení předáno do boxu." else "Platnost kódu vypršela."
+                    }
+                }
+            } catch (e: Exception) {
+                null
+            }
+            status.text = if (code == null) "Telefon není připojený k Wi-Fi."
+            else "Na boxu otevři Nastavení → Načíst z telefonu a zadej kód:\n\n      $code\n\nKód platí 5 minut. Nech tuto obrazovku otevřenou."
+            dlg.show()
+        }
+        findViewById<Button>(R.id.recv_cfg).setOnClickListener {
+            val input = EditText(this).apply {
+                hint = "např. 123-4567"
+                inputType = android.text.InputType.TYPE_CLASS_PHONE
+            }
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Načíst z telefonu")
+                .setMessage("V telefonu dej Nastavení → Poslat do TV a opiš sem zobrazený kód.")
+                .setView(input)
+                .setPositiveButton("Načíst") { _, _ ->
+                    val code = input.text.toString()
+                    Thread {
+                        val err = ConfigTransfer.receive(this, code)
+                        runOnUiThread {
+                            if (err == null) {
+                                android.widget.Toast.makeText(this, "✅ Nastavení načteno", android.widget.Toast.LENGTH_LONG).show()
+                                recreate() // znovu načíst pole z nového nastavení
+                            } else {
+                                android.widget.Toast.makeText(this, "❌ $err", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }.start()
+                }
+                .setNegativeButton("Zrušit", null)
+                .show()
+        }
+    }
+
+    override fun onDestroy() {
+        ConfigTransfer.stopSending()
+        super.onDestroy()
+    }
+
+    // ---------- doplňování historie na pozadí ----------
+    private var backfillRunning = false
+
+    private fun startBackgroundBackfill(restart: Boolean) {
+        if (backfillRunning) return
+        backfillRunning = true
+        val btn = findViewById<Button>(R.id.backfill)
+        val out = findViewById<TextView>(R.id.backfill_result)
+        btn.isEnabled = false
+        val ticker = object : Runnable {
+            override fun run() {
+                if (!backfillRunning) return
+                out.text = (HistoryBackfill.progress ?: "Doplňuji historii z Tuya…") +
+                    "\n(kvůli limitům Tuya může trvat několik minut, nastavení můžeš zavřít)"
+                out.postDelayed(this, 1_000)
+            }
+        }
+        out.post(ticker)
+        Thread {
+            val n = try {
+                HistoryBackfill.run(this, prefs, TuyaClient(prefs), restart)
+            } catch (e: Exception) {
+                -1
+            }
+            runOnUiThread {
+                backfillRunning = false
+                btn.isEnabled = true
+                out.text = (if (n >= 0) "Doplněno nebo rozšířeno $n záznamů.\n\n" else "Doplnění selhalo.\n\n") + backfillStats()
+            }
+        }.start()
     }
 
     // ---------- test klíčů ----------

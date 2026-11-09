@@ -80,6 +80,50 @@ class TvPanel(private val ctx: Context) {
         addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fit() }
     }
 
+    /** Tlačítko „⚙ Nastavení“ v rohu – jde na něj najet ovladačem a potvrdit OK. */
+    fun addSettingsButton(onClick: () -> Unit): View {
+        val d = ctx.resources.displayMetrics.density
+        val btn = android.widget.TextView(ctx).apply {
+            text = "⚙  Nastavení"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            setPadding((14 * d).toInt(), (8 * d).toInt(), (14 * d).toInt(), (8 * d).toInt())
+            isFocusable = true
+            isClickable = true
+            background = android.graphics.drawable.StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_focused), android.graphics.drawable.GradientDrawable().apply {
+                    setColor(0xFFFFD54F.toInt()); cornerRadius = 20 * d
+                })
+                addState(intArrayOf(), android.graphics.drawable.GradientDrawable().apply {
+                    setColor(0x99171B21.toInt()); cornerRadius = 20 * d; setStroke((1 * d).toInt(), 0x55FFFFFF)
+                })
+            }
+            setOnFocusChangeListener { v, has -> (v as android.widget.TextView).setTextColor(if (has) Color.BLACK else Color.WHITE) }
+            setOnClickListener { onClick() }
+        }
+        root.addView(btn, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.TOP or android.view.Gravity.END).apply {
+            topMargin = (12 * d).toInt(); rightMargin = (16 * d).toInt()
+        })
+        btn.requestFocus()
+        return btn
+    }
+
+    /** Krátká nápověda ovládání po spuštění. */
+    fun showHint(text: String) {
+        val d = ctx.resources.displayMetrics.density
+        val hint = android.widget.TextView(ctx).apply {
+            this.text = text
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setPadding((16 * d).toInt(), (8 * d).toInt(), (16 * d).toInt(), (8 * d).toInt())
+            background = android.graphics.drawable.GradientDrawable().apply { setColor(0xCC171B21.toInt()); cornerRadius = 18 * d }
+        }
+        root.addView(hint, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = (24 * d).toInt()
+        })
+        handler.postDelayed({ root.removeView(hint) }, 6_000)
+    }
+
     private val tick = object : Runnable {
         override fun run() {
             if (!running) return

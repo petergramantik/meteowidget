@@ -55,7 +55,20 @@ object HistoryBackfill {
      * jinak pokračuje u dnů, které ještě nejsou hotové.
      * Vrací počet doplněných/rozšířených záznamů.
      */
+    /** Průběh pro zobrazení v nastavení (null = neběží). */
+    @Volatile var progress: String? = null
+        private set
+
     fun run(ctx: Context, p: Prefs, client: TuyaClient, restart: Boolean = true): Int {
+        progress = "Doplňuji historii z Tuya…"
+        try {
+            return runInner(ctx, p, client, restart)
+        } finally {
+            progress = null
+        }
+    }
+
+    private fun runInner(ctx: Context, p: Prefs, client: TuyaClient, restart: Boolean): Int {
         val now = System.currentTimeMillis()
         sp(ctx).edit().putLong("histBackfillTry", now).apply()
         if (restart) {
@@ -73,6 +86,7 @@ object HistoryBackfill {
             val from = today - k * DAY
             val to = minOf(from + DAY, now)
             if (from.toString() in done) continue
+            progress = "Doplňuji historii z Tuya: den ${k + 1}/$DAYS…"
             try {
                 var logs = client.fetchReportLogsMulti(CODES, from, to)
                 if (logs.isEmpty()) logs = client.fetchLogsV1Multi(CODES, from, to)

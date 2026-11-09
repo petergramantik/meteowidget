@@ -15,6 +15,7 @@ import android.widget.Toast
  */
 class DashboardActivity : Activity() {
     private lateinit var panel: TvPanel
+    private lateinit var settingsBtn: android.view.View
     private var toast: Toast? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,6 +36,8 @@ class DashboardActivity : Activity() {
         TvSchedule.reschedule(this)
         panel = TvPanel(this)
         setContentView(panel.root)
+        settingsBtn = panel.addSettingsButton { openSettings() }
+        panel.showHint("OK = nastavení  ·  ↑ ↓ jas  ·  → obnovit")
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             window.insetsController?.let {
                 it.hide(WindowInsets.Type.systemBars())
@@ -76,10 +79,18 @@ class DashboardActivity : Activity() {
         const val EXTRA_SCHEDULED = "scheduled"
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        when (keyCode) {
+    private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java))
+
+    /**
+     * Klávesy zachytáváme už na úrovni okna, aby je nic nepřebilo.
+     * OK potvrdí tlačítko Nastavení (má focus), Menu otevře nastavení vždy.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> { openSettings(); return true }
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                val b = panel.changeBrightness(if (keyCode == KeyEvent.KEYCODE_DPAD_UP) 5 else -5)
+                val b = panel.changeBrightness(if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) 5 else -5)
                 show((if (panel.isNight) "Noční jas" else "Jas") + ": $b %")
                 return true
             }
@@ -88,11 +99,13 @@ class DashboardActivity : Activity() {
                 panel.refreshNow()
                 return true
             }
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_MENU -> {
-                startActivity(Intent(this, SettingsActivity::class.java))
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+            KeyEvent.KEYCODE_BUTTON_A -> {
+                if (!settingsBtn.isFocused) settingsBtn.requestFocus()
+                openSettings()
                 return true
             }
         }
-        return super.onKeyDown(keyCode, event)
+        return super.dispatchKeyEvent(event)
     }
 }

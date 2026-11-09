@@ -25,6 +25,12 @@
 
         <TextView style="@style/Section" android:text="Klíče a přístupy" />
 
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <Button android:id="@+id/send_cfg" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="📲 Poslat do TV" />
+            <Button android:id="@+id/recv_cfg" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:text="📺 Načíst z telefonu" />
+        </LinearLayout>
+        <TextView style="@style/Label" android:text="Přenese klíče a nastavení z telefonu do boxu přes domácí Wi-Fi (oba musí být ve stejné síti)." />
+
         <TextView style="@style/Label" android:textStyle="bold" android:textColor="#333333" android:text="Tuya Cloud – data ze stanice (povinné)" />
         <TextView style="@style/Label" android:autoLink="web" android:text="Cloud projekt na iot.tuya.com → Overview (Access ID/Secret), Devices (Device ID): https://iot.tuya.com" />
         <TextView style="@style/Label" android:text="Access ID / Client ID" />

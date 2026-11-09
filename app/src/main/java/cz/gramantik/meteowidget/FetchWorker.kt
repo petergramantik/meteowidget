@@ -17,7 +17,8 @@ object Sync {
     private const val FORECAST_EVERY = 60 * 60_000L
     private const val UPDATE_EVERY = 12 * 60 * 60_000L
 
-    fun run(ctx: Context, forceForecast: Boolean = false) {
+    /** [heavy] = i doplňování historie z Tuya (pomalé kvůli limitům); test v nastavení ho vynechá. */
+    fun run(ctx: Context, forceForecast: Boolean = false, heavy: Boolean = true) {
         val p = Prefs(ctx)
         val db = MeteoDb.get(ctx)
         if (p.isConfigured) {
@@ -30,7 +31,7 @@ object Sync {
                 w.pressure?.let { PressureHistory.add(ctx, listOf(t to it)) }
                 val prev = db.last()
                 // mezera v historii (telefon uspal aplikaci) -> zkusit doplnit z Tuya
-                if (prev != null && t - prev.t > 30 * 60_000L) {
+                if (heavy && prev != null && t - prev.t > 30 * 60_000L) {
                     try {
                         HistoryBackfill.fillGap(ctx, p, client, prev.t, t)
                     } catch (e: Exception) {
@@ -47,11 +48,13 @@ object Sync {
             } catch (e: Exception) {
                 p.lastError = e.message ?: e.javaClass.simpleName
             }
-            backfillPressure(ctx, p, client)
-            try {
-                HistoryBackfill.runIfNeeded(ctx, p, client)
-            } catch (e: Exception) {
-                // zkusí se později
+            if (heavy) {
+                backfillPressure(ctx, p, client)
+                try {
+                    HistoryBackfill.runIfNeeded(ctx, p, client)
+                } catch (e: Exception) {
+                    // zkusí se později
+                }
             }
         }
         val now = System.currentTimeMillis()

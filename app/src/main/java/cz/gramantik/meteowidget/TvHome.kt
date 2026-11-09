@@ -56,6 +56,9 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         setPadding(ctx.dp(10), ctx.dp(7), ctx.dp(10), ctx.dp(7))
     }
 
+    /** tenká svislá dělicí linka mezi sloupci předpovědi */
+    private fun sep() = View(ctx).apply { setBackgroundColor(0x1FFFFFFF) }
+
     /** Levý panel v pohledu Zítra: očekávané počasí. */
     private fun buildTomorrowLeft(left: LinearLayout, d: DayF?) {
         val c = ctx
@@ -271,13 +274,14 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             else hours.take(12)
         hcol.addView(c.label(if (tomorrow) "ZÍTRA 6–21 H" else "PŘÍŠTÍCH 12 HODIN", C.BARO).apply { textSize = 9f })
         val hr = c.hbox(Gravity.TOP)
-        shownHours.forEach { h ->
+        shownHours.forEachIndexed { i, h ->
+            if (i > 0) hr.addView(sep(), c.lp(1, LinearLayout.LayoutParams.MATCH_PARENT))
             hr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
                 // zítra 16 hodin – užší buňky
-                addView(c.text(if (tomorrow) "${h.time.hour}" else "${h.time.hour}:00", 9f, C.LABEL))
+                addView(c.text(if (tomorrow) "${h.time.hour}" else "${h.time.hour}:00", 9f, C.LABEL), c.lp(WRAP, WRAP))
                 addView(c.icon(h.icon, if (tomorrow) 17 else 24), c.lp(WRAP, WRAP, top = 1))
-                addView(c.text(deg(h.temp), if (tomorrow) 10f else 12f, C.WHITE, condensed = true))
-                addView(c.text(if (h.precip >= 0.1) f1(h.precip) else " ", if (tomorrow) 7f else 8f, C.RAIN))
+                addView(c.text(deg(h.temp), if (tomorrow) 10f else 12f, C.WHITE, condensed = true), c.lp(WRAP, WRAP))
+                addView(c.text(if (h.precip >= 0.1) f1(h.precip) else " ", if (tomorrow) 7f else 8f, C.RAIN), c.lp(WRAP, WRAP))
             }, c.lp(0, WRAP, 1f))
         }
         hcol.addView(hr, c.lp(top = 4))
@@ -287,16 +291,17 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         dcol.addView(c.label("10 DNÍ", C.BARO).apply { textSize = 9f })
         val dr = c.hbox(Gravity.TOP)
         val days = f?.days?.filter { !it.date.isBefore(today) }?.take(10) ?: emptyList()
-        days.forEach { d ->
+        days.forEachIndexed { i, d ->
+            if (i > 0) dr.addView(sep(), c.lp(1, LinearLayout.LayoutParams.MATCH_PARENT))
             val name = when (d.date) {
                 today -> "Dnes"
                 else -> d.date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, cz).take(2).replaceFirstChar { it.uppercase() }
             }
             dr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
-                addView(c.text(name, 9f, C.LABEL))
+                addView(c.text(name, 9f, C.LABEL), c.lp(WRAP, WRAP))
                 addView(c.icon(d.icon, 24), c.lp(WRAP, WRAP, top = 1))
-                addView(c.text(deg(d.tMax), 11f, C.IN, condensed = true))
-                addView(c.text(deg(d.tMin), 10f, 0xFF8FB3FF.toInt(), condensed = true))
+                addView(c.text(deg(d.tMax), 11f, C.IN, condensed = true), c.lp(WRAP, WRAP))
+                addView(c.text(deg(d.tMin), 10f, 0xFF8FB3FF.toInt(), condensed = true), c.lp(WRAP, WRAP))
             }, c.lp(0, WRAP, 1f))
         }
         dcol.addView(dr, c.lp(top = 4))

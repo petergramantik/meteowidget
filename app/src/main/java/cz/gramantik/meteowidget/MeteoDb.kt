@@ -92,6 +92,27 @@ class MeteoDb private constructor(ctx: Context) :
         )
     }
 
+    /**
+     * Sloučí záznam s nejbližším existujícím (±tol): doplní jen chybějící hodnoty.
+     * Když v okolí žádný není, vloží nový. Vrací true, pokud se něco změnilo.
+     */
+    fun mergeNear(s: Sample, tol: Long): Boolean {
+        val existing = readableDatabase.rawQuery(
+            "SELECT t FROM samples WHERE t BETWEEN ? AND ? ORDER BY ABS(t - ?) LIMIT 1",
+            arrayOf((s.t - tol).toString(), (s.t + tol).toString(), s.t.toString())
+        ).use { if (it.moveToFirst()) it.getLong(0) else null }
+        if (existing == null) {
+            insert(s, replace = false)
+            return true
+        }
+        val cols = Sample.COLS.filter { s.get(it) != null }
+        if (cols.isEmpty()) return false
+        val sql = "UPDATE samples SET " + cols.joinToString(", ") { "$it = COALESCE($it, ?)" } + " WHERE t = ?"
+        val args: Array<Any> = (cols.map { s.get(it)!! as Any } + existing).toTypedArray()
+        writableDatabase.execSQL(sql, args)
+        return true
+    }
+
     /** Je v okolí času t (±tol) už nějaký záznam? */
     fun hasNear(t: Long, tol: Long): Boolean =
         readableDatabase.rawQuery(

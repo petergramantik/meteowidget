@@ -57,25 +57,39 @@ object Updater {
         return p.availableUrl.isNotEmpty() && p.availableVersion > currentVersion(ctx)
     }
 
-    /** Stáhne APK a předá ho systémovému instalátoru (Android požádá o potvrzení). */
-    fun downloadAndInstall(ctx: Context, progress: (Int) -> Unit) {
-        val url = Prefs(ctx).availableUrl
-        if (url.isEmpty()) throw Exception("Není co instalovat")
-        val file = File(ctx.cacheDir, "update.apk")
+    const val RELEASES_PAGE = "https://github.com/petergramantik/meteowidget/releases/latest"
 
+    class HttpError(val code: Int) : Exception("HTTP $code")
+
+    private fun friendly(e: Exception): String = when {
+        e is HttpError && e.code >= 500 -> "Server GitHub je dočasně nedostupný, zkus to za chvíli"
+        e is HttpError && e.code == 404 -> "Soubor s novou verzí nebyl nalezen"
+        e is java.net.UnknownHostException || e is java.net.SocketTimeoutException ||
+            e is java.net.ConnectException || e is java.io.IOException -> "Stahování se přerušilo – zkontroluj připojení"
+        else -> e.message ?: "Stahování selhalo"
+    }
+
+    private fun download(url: String, file: File, progress: (Int) -> Unit) {
         var conn = URL(url).openConnection() as HttpURLConnection
         conn.instanceFollowRedirects = true
+        conn.connectTimeout = 20_000
+        conn.readTimeout = 30_000
         conn.setRequestProperty("User-Agent", "meteowidget-android")
-        // GitHub přesměrovává na jinou doménu – projít přesměrování ručně
         var redirects = 0
         while (conn.responseCode in 300..399 && redirects < 5) {
             val loc = conn.getHeaderField("Location")
             conn.disconnect()
             conn = URL(loc).openConnection() as HttpURLConnection
+            conn.connectTimeout = 20_000
+            conn.readTimeout = 30_000
             conn.setRequestProperty("User-Agent", "meteowidget-android")
             redirects++
         }
-        if (conn.responseCode !in 200..299) throw Exception("Stahování HTTP ${conn.responseCode}")
+        if (conn.responseCode !in 200..299) {
+            val c = conn.responseCode
+            conn.disconnect()
+            throw HttpError(c)
+        }
         val total = conn.contentLengthLong
         conn.inputStream.use { input ->
             file.outputStream().use { out ->
@@ -91,6 +105,27 @@ object Updater {
             }
         }
         conn.disconnect()
+        if (total > 0 && file.length() != total) throw java.io.IOException("neúplný soubor")
+    }
+
+    /** Stáhne APK a předá ho systémovému instalátoru (Android požádá o potvrzení). */
+    fun downloadAndInstall(ctx: Context, progress: (Int) -> Unit) {
+        val url = Prefs(ctx).availableUrl
+        if (url.isEmpty()) throw Exception("Není co instalovat")
+        val file = File(ctx.cacheDir, "update.apk")
+        // až 3 pokusy – GitHub občas vrátí 5xx nebo spojení spadne
+        var lastErr: Exception? = null
+        for (attempt in 1..3) {
+            try {
+                download(url, file, progress)
+                lastErr = null
+                break
+            } catch (e: Exception) {
+                lastErr = e
+                if (attempt < 3) Thread.sleep(3_000L * attempt)
+            }
+        }
+        lastErr?.let { throw Exception(friendly(it)) }
 
         val installer = ctx.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)

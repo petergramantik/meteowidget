@@ -150,7 +150,7 @@ class SettingsActivity : Activity() {
                 return@setOnClickListener
             }
             btn.isEnabled = false
-            backfillResult.text = "Stahuji historii z Tuya… (může trvat i minutu)"
+            backfillResult.text = "Stahuji historii z Tuya… (kvůli limitům Tuya může trvat několik minut)"
             Thread {
                 val n = try {
                     HistoryBackfill.run(this, prefs, TuyaClient(prefs))
@@ -159,7 +159,7 @@ class SettingsActivity : Activity() {
                 }
                 runOnUiThread {
                     btn.isEnabled = true
-                    backfillResult.text = (if (n >= 0) "Vloženo $n nových záznamů.\n\n" else "Doplnění selhalo.\n\n") + backfillStats()
+                    backfillResult.text = (if (n >= 0) "Doplněno nebo rozšířeno $n záznamů.\n\n" else "Doplnění selhalo.\n\n") + backfillStats()
                 }
             }.start()
         }
@@ -298,7 +298,8 @@ class SettingsActivity : Activity() {
         val t = HistoryBackfill.lastRun(this)
         return "Poslední doplnění: " +
             java.text.SimpleDateFormat("d.M. HH:mm", java.util.Locale("cs", "CZ")).format(java.util.Date(t)) + "\n" +
-            st.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+            (st["_stav"]?.let { it + "\n" } ?: "") +
+            st.entries.filter { it.key != "_stav" }.joinToString("\n") { "${it.key}: ${it.value}" }
     }
 
     private fun report(): String = buildString {
@@ -327,6 +328,7 @@ class SettingsActivity : Activity() {
 
     // ---------- aktualizace ----------
     private fun refreshUpdateUi() {
+        offerBrowser = false
         val cur = Updater.currentVersion(this)
         if (Updater.updateAvailable(this)) {
             updateStatus.text = "Verze 1.$cur · k dispozici je nová verze 1.${prefs.availableVersion}"
@@ -338,7 +340,18 @@ class SettingsActivity : Activity() {
         updateButton.isEnabled = true
     }
 
+    /** Po neúspěšném stažení tlačítko otevře stránku s APK v prohlížeči. */
+    private var offerBrowser = false
+
     private fun onUpdateClick() {
+        if (offerBrowser) {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Updater.RELEASES_PAGE)))
+            } catch (e: Exception) {
+                // bez prohlížeče
+            }
+            return
+        }
         if (!Updater.updateAvailable(this)) {
             updateButton.isEnabled = false
             updateStatus.text = "Kontroluji…"
@@ -377,6 +390,8 @@ class SettingsActivity : Activity() {
             } catch (e: Exception) {
                 runOnUiThread {
                     updateStatus.text = "⚠ ${e.message}"
+                    offerBrowser = true
+                    updateButton.text = "Stáhnout v prohlížeči"
                     updateButton.isEnabled = true
                 }
             }

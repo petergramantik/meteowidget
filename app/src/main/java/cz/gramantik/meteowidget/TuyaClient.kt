@@ -60,70 +60,99 @@ class TuyaClient(private val prefs: Prefs) {
         return map
     }
 
+    /** Záznam z historie: kód hodnoty, čas (ms), surová hodnota. */
+    data class LogEntry(val code: String, val t: Long, val v: Double)
+
+    class RateLimitException(msg: String) : TuyaException(msg)
+
+    private var lastLogCall = 0L
+
     /**
-     * Historie hlášení jedné hodnoty z Tuya cloudu (event_time v ms, surová hodnota).
-     * Parametry dotazu musí být seřazené podle abecedy kvůli podpisu.
+     * Dotaz na logy s pauzou mezi voláními a opakováním při limitu Tuya
+     * (chyba 40000309 „log query is too frequent“).
      */
-    fun fetchReportLogs(code: String, from: Long, to: Long, maxPages: Int = 15): List<Pair<Long, Double>> {
-        val out = ArrayList<Pair<Long, Double>>()
+    private fun logRequest(path: String): JSONObject {
+        var wait = 5_000L
+        repeat(4) { attempt ->
+            val since = System.currentTimeMillis() - lastLogCall
+            if (since < 1_500) Thread.sleep(1_500 - since)
+            lastLogCall = System.currentTimeMillis()
+            try {
+                return try {
+                    request(path, getToken())
+                } catch (e: TokenInvalidException) {
+                    prefs.clearToken()
+                    request(path, getToken())
+                }
+            } catch (e: TuyaException) {
+                if (e.message?.contains("40000309") != true) throw e
+                if (attempt == 3) throw RateLimitException("Tuya omezila počet dotazů")
+                Thread.sleep(wait)
+                wait *= 2
+            }
+        }
+        throw RateLimitException("Tuya omezila počet dotazů")
+    }
+
+    private fun parseLogs(logs: org.json.JSONArray?, codes: Set<String>, out: MutableList<LogEntry>) {
+        if (logs == null) return
+        for (i in 0 until logs.length()) {
+            val o = logs.getJSONObject(i)
+            val code = o.optString("code")
+            if (code !in codes) continue
+            val v = o.optString("value").toDoubleOrNull() ?: continue
+            out.add(LogEntry(code, o.optLong("event_time"), v))
+        }
+    }
+
+    /** Historie více hodnot najednou (nové API report-logs). Parametry musí být seřazené kvůli podpisu. */
+    fun fetchReportLogsMulti(codes: List<String>, from: Long, to: Long, maxPages: Int = 30): List<LogEntry> {
+        val out = ArrayList<LogEntry>()
         var rowKey: String? = null
         repeat(maxPages) {
             val q = sortedMapOf(
-                "codes" to code,
+                "codes" to codes.joinToString(","),
                 "end_time" to to.toString(),
                 "size" to "100",
                 "start_time" to from.toString(),
             )
             rowKey?.let { q["last_row_key"] = it }
-            val path = "/v2.0/cloud/thing/${prefs.deviceId}/report-logs?" +
-                q.entries.joinToString("&") { "${it.key}=${it.value}" }
-            val json = request(path, getToken())
+            val json = logRequest("/v2.0/cloud/thing/${prefs.deviceId}/report-logs?" +
+                q.entries.joinToString("&") { "${it.key}=${it.value}" })
             val r = json.optJSONObject("result") ?: return out
-            val logs = r.optJSONArray("logs")
-            if (logs != null) {
-                for (i in 0 until logs.length()) {
-                    val o = logs.getJSONObject(i)
-                    val v = o.optString("value").toDoubleOrNull() ?: continue
-                    out.add(o.optLong("event_time") to v)
-                }
-            }
+            parseLogs(r.optJSONArray("logs"), codes.toSet(), out)
             if (!r.optBoolean("has_more")) return out
             rowKey = r.optString("last_row_key").ifEmpty { return out }
         }
         return out
     }
 
-    /** Starší API pro logy zařízení (záložní, když v2 nic nevrátí). type=7 = hlášení hodnot. */
-    fun fetchLogsV1(code: String, from: Long, to: Long, maxPages: Int = 15): List<Pair<Long, Double>> {
-        val out = ArrayList<Pair<Long, Double>>()
+    /** Totéž přes starší API (záložní). */
+    fun fetchLogsV1Multi(codes: List<String>, from: Long, to: Long, maxPages: Int = 30): List<LogEntry> {
+        val out = ArrayList<LogEntry>()
         var rowKey: String? = null
         repeat(maxPages) {
             val q = sortedMapOf(
-                "codes" to code,
+                "codes" to codes.joinToString(","),
                 "end_time" to to.toString(),
                 "size" to "100",
                 "start_time" to from.toString(),
                 "type" to "7",
             )
             rowKey?.let { q["start_row_key"] = it }
-            val path = "/v1.0/devices/${prefs.deviceId}/logs?" +
-                q.entries.joinToString("&") { "${it.key}=${it.value}" }
-            val json = request(path, getToken())
+            val json = logRequest("/v1.0/devices/${prefs.deviceId}/logs?" +
+                q.entries.joinToString("&") { "${it.key}=${it.value}" })
             val r = json.optJSONObject("result") ?: return out
-            val logs = r.optJSONArray("logs")
-            if (logs != null) {
-                for (i in 0 until logs.length()) {
-                    val o = logs.getJSONObject(i)
-                    if (o.optString("code") != code) continue
-                    val v = o.optString("value").toDoubleOrNull() ?: continue
-                    out.add(o.optLong("event_time") to v)
-                }
-            }
+            parseLogs(r.optJSONArray("logs"), codes.toSet(), out)
             if (!r.optBoolean("has_next")) return out
             rowKey = r.optString("next_row_key").ifEmpty { return out }
         }
         return out
     }
+
+    /** Historie jedné hodnoty (používá graf tlaku). */
+    fun fetchReportLogs(code: String, from: Long, to: Long, maxPages: Int = 15): List<Pair<Long, Double>> =
+        fetchReportLogsMulti(listOf(code), from, to, maxPages).map { it.t to it.v }
 
     private fun readStatus(): Map<String, Any> {
         val token = getToken()

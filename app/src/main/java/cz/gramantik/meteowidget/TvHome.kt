@@ -187,6 +187,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             left.addView(c.text(sum, 9.5f, C.WIND, condensed = true), c.lp(top = 2))
         }
         if (p.lastError != null) left.addView(c.text(friendlyError(p.lastError, p.lastUpdate) ?: "", 9f, C.ACCENT), c.lp(top = 3))
+        else if (p.lastUpdate > 0 && System.currentTimeMillis() - p.lastUpdate > 15 * 60_000)
+            left.addView(c.text("⚠ data z " + java.text.SimpleDateFormat("HH:mm", cz).format(Date(p.lastUpdate)), 9f, C.ACCENT), c.lp(top = 3))
         }
         row.addView(left, c.lp(c.dp(255), c.dp(168), end = 8))
         val nowHour = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0)

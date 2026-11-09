@@ -158,6 +158,16 @@ class MainActivity : Activity() {
         title.text = listOf("Stanice", "Předpověď", "Radar")[i]
     }
 
+    /** Přepnutí na vedlejší kartu přejetím prstem (dir +1 = další, −1 = předchozí). */
+    fun swipe(dir: Int) {
+        val t = current + dir
+        if (t !in 0..2) return
+        show(t)
+        container.translationX = dir * container.width * 0.3f
+        container.alpha = 0.4f
+        container.animate().translationX(0f).alpha(1f).setDuration(180).start()
+    }
+
     /** Stáhne nová data a překreslí obrazovky. */
     fun refreshData() {
         refreshBtn.isEnabled = false

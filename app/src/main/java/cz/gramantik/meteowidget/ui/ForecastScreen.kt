@@ -130,7 +130,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         }
         val storm = upcoming(f).take(12).maxOfOrNull { it.storm } ?: 0
         if (storm > 0) c.addView(a.text(ForecastFull.stormText(storm) + " v příštích 12 h", 13f, C.ACCENT, bold = true), a.lp(top = 8))
-        content.addView(c, a.lp(bottom = 4))
+        content.addView(SwipeFrame(a) { (a as? MainActivity)?.swipe(it) }.apply { addView(c) }, a.lp(bottom = 4))
     }
 
     // ---------- hodinová ----------

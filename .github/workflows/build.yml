@@ -27,7 +27,9 @@ jobs:
         run: gradle assembleRelease -PversionCode=${{ github.run_number }} --no-daemon --stacktrace
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk meteowidget-1.${{ github.run_number }}.apk
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk meteowidget-1.${{ github.run_number }}.apk
+          cp app/build/outputs/apk/release/app-release.apk meteowidget.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
@@ -35,5 +37,7 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: Meteostanice 1.${{ github.run_number }}
           body: ${{ github.event.head_commit.message }}
-          files: meteowidget-1.${{ github.run_number }}.apk
+          files: |
+            meteowidget-1.${{ github.run_number }}.apk
+            meteowidget.apk
           make_latest: true

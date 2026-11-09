@@ -407,6 +407,7 @@ class SettingsActivity : Activity() {
                 !filled -> "—"
                 st.startsWith("✅") -> "✅"
                 st.startsWith("❌") -> "❌"
+                st.isEmpty() -> "neověřeno"
                 else -> "⚠"
             }
         }
@@ -518,9 +519,21 @@ class SettingsActivity : Activity() {
                     val code = input.text.toString()
                     Thread {
                         val err = ConfigTransfer.receive(this, code)
+                        if (err == null) {
+                            runOnUiThread {
+                                android.widget.Toast.makeText(this, "✅ Nastavení načteno – ověřuji klíče…", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                            // klíče na tomto zařízení rovnou otestovat
+                            try {
+                                Sync.run(this, forceForecast = true, heavy = false)
+                                testKeys()
+                            } catch (e: Exception) {
+                                // stav se doplní při příštím „Uložit a otestovat“
+                            }
+                        }
                         runOnUiThread {
                             if (err == null) {
-                                android.widget.Toast.makeText(this, "✅ Nastavení načteno", android.widget.Toast.LENGTH_LONG).show()
+                                android.widget.Toast.makeText(this, "✅ Nastavení načteno a klíče ověřeny", android.widget.Toast.LENGTH_LONG).show()
                                 recreate() // znovu načíst pole z nového nastavení
                             } else {
                                 android.widget.Toast.makeText(this, "❌ $err", android.widget.Toast.LENGTH_LONG).show()
@@ -619,7 +632,10 @@ class SettingsActivity : Activity() {
     private fun showKeyStatus() {
         val sp = getSharedPreferences("meteo", MODE_PRIVATE)
         listOf(R.id.st_tuya to "stTuya", R.id.st_mapy to "stMapy", R.id.st_owm to "stOwm", R.id.st_google to "stGoogle", R.id.st_ics to "stIcs")
-            .forEach { (id, k) -> findViewById<TextView>(id).text = sp.getString(k, "") }
+            .forEach { (id, k) ->
+                val st = sp.getString(k, "") ?: ""
+                findViewById<TextView>(id).text = st.ifEmpty { "neověřeno – ověří se po „Uložit a otestovat“" }
+            }
     }
 
     private fun backfillStats(): String {

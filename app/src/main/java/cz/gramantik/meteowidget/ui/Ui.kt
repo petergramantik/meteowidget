@@ -211,3 +211,54 @@ fun Context.isTv(): Boolean {
     val dm = resources.displayMetrics
     return noTouch && dm.widthPixels >= dm.heightPixels
 }
+
+/**
+ * Obal panelu, který rozpozná vodorovné přejetí prstem (swipe) a zavolá [onSwipe]
+ * se směrem +1 (doleva = další karta) nebo −1 (doprava = předchozí). Klepnutí projdou dál.
+ */
+class SwipeFrame(ctx: Context, private val onSwipe: (Int) -> Unit) : android.widget.FrameLayout(ctx) {
+    private val slop = android.view.ViewConfiguration.get(ctx).scaledTouchSlop
+    private var x0 = 0f
+    private var y0 = 0f
+    private var swiping = false
+
+    override fun onInterceptTouchEvent(e: android.view.MotionEvent): Boolean {
+        when (e.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> { x0 = e.x; y0 = e.y; swiping = false }
+            android.view.MotionEvent.ACTION_MOVE -> {
+                val dx = e.x - x0
+                val dy = e.y - y0
+                if (!swiping && kotlin.math.abs(dx) > slop * 2 && kotlin.math.abs(dx) > 2 * kotlin.math.abs(dy)) {
+                    swiping = true
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+            }
+        }
+        return swiping
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
+        val child = getChildAt(0)
+        when (e.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> { x0 = e.x; y0 = e.y; swiping = false; return true }
+            android.view.MotionEvent.ACTION_MOVE -> {
+                val dx = e.x - x0
+                if (!swiping && kotlin.math.abs(dx) > slop * 2 && kotlin.math.abs(dx) > 2 * kotlin.math.abs(e.y - y0)) {
+                    swiping = true
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                if (swiping) child?.translationX = dx * 0.35f
+            }
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                val dx = e.x - x0
+                child?.animate()?.translationX(0f)?.setDuration(150)?.start()
+                if (swiping && e.actionMasked == android.view.MotionEvent.ACTION_UP &&
+                    kotlin.math.abs(dx) > 60 * resources.displayMetrics.density
+                ) onSwipe(if (dx < 0) 1 else -1)
+                swiping = false
+            }
+        }
+        return true
+    }
+}

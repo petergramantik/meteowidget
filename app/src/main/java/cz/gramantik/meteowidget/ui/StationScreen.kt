@@ -158,8 +158,8 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
                 big.addView(r, a.lp(bottom = 2))
             }
         }
-        big.addView(a.text("Klepni na čidlo pro graf", 11f, C.DIM), a.lp(top = 6))
-        content.addView(big, a.lp(bottom = 10))
+        big.addView(a.text("Klepni na čidlo pro graf · přejetím do strany další karta", 11f, C.DIM), a.lp(top = 6))
+        content.addView(SwipeFrame(a) { (a as? MainActivity)?.swipe(it) }.apply { addView(big) }, a.lp(bottom = 10))
         openChannel?.let { channelCharts(p, it) }
         humidityChart(p)
 

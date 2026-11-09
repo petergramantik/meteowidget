@@ -153,14 +153,19 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
     }
 
     /** Stáhne nová data, pokud jsou starší než 5 min. */
+    private var syncStarted = 0L
+
     private fun maybeSync(force: Boolean = false) {
         val p = Prefs(ctx)
-        if (syncing) return
+        // pojistka: zaseknuté stahování (výpadek Wi-Fi) po 3 min přeskočit
+        if (syncing && System.currentTimeMillis() - syncStarted < 3 * 60_000) return
         if (!force && System.currentTimeMillis() - p.lastUpdate < 5 * 60_000) return
         syncing = true
+        syncStarted = System.currentTimeMillis()
         Thread {
             try {
-                Sync.run(ctx)
+                // jen aktuální data a předpověď; historii doplňuje zvlášť práce na pozadí (FetchWorker)
+                Sync.run(ctx, heavy = false)
             } finally {
                 handler.post {
                     syncing = false

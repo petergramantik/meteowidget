@@ -27,6 +27,7 @@ object Sync {
                 val data = client.fetchStatus()
                 val t = System.currentTimeMillis()
                 p.saveData(data, t)
+                ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE).edit().putString("stTuya", "✅ funguje").apply()
                 val w = Weather(data, p.spec)
                 w.pressure?.let { PressureHistory.add(ctx, listOf(t to it)) }
                 val prev = db.last()

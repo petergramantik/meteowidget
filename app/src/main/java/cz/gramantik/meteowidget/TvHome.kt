@@ -124,12 +124,27 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         Alerts.load(c).firstOrNull()?.let { al ->
             left.addView(c.text("⚠ ${al.event} · ${SimpleDateFormat("EEE HH:mm", cz).format(Date(al.onset))}–${SimpleDateFormat("HH:mm", cz).format(Date(al.expires))}", 10f, al.color, bold = true), c.lp(top = 3))
         }
-        if (p.lastError != null) left.addView(c.text(friendlyError(p.lastError, p.lastUpdate) ?: "", 9f, C.ACCENT), c.lp(top = 3))
-        row.addView(left, c.lp(c.dp(255), c.dp(168), end = 8))
-
-        // uprostřed: dlaždice 2×3
         val trend = PressureHistory.trend3h(c)
         val arrow = when { trend == null -> ""; trend >= 1 -> " ↗"; trend <= -1 -> " ↘"; else -> " →" }
+        val morning = MorningPrefs(c).active()
+        if (morning) {
+            // ranní režim: dlaždice nahradí jeden řádek a svátek
+            val sum = "💨 ${f1(w?.windAvg)} km/h · " +
+                (w?.pressure?.let { String.format(cz, "%.0f", it) } ?: "--") + " hPa$arrow · UV ${f1(w?.uv)}"
+            left.addView(c.text(sum, 10f, C.WIND, condensed = true), c.lp(top = 4))
+            left.addView(c.text("Svátek: ${NameDays.forDate(c, LocalDate.now())}", 10f, C.WHITE, bold = true), c.lp(top = 2))
+        }
+        if (p.lastError != null) left.addView(c.text(friendlyError(p.lastError, p.lastUpdate) ?: "", 9f, C.ACCENT), c.lp(top = 3))
+        row.addView(left, c.lp(c.dp(255), c.dp(168), end = 8))
+        val f = ForecastFull.load(c)
+        val nowHour = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0)
+        val hours = f?.hours?.filter { !it.time.isBefore(nowHour) } ?: emptyList()
+        val today = LocalDate.now()
+        if (morning) {
+            row.addView(TvMorning.build(c, 168))
+        } else {
+
+        // uprostřed: dlaždice 2×3
         val tiles = listOf(
             Triple("VÍTR", "${f1(w?.windAvg)} km/h", C.WIND) to (w?.windGust?.let { "nárazy ${f1(it)}" } ?: ""),
             Triple("SRÁŽKY DNES", "${f1(w?.rainDay)} mm", C.RAIN) to (w?.rainRate?.takeIf { it > 0 }?.let { "prší ${f1(it)} mm/h" } ?: "neprší"),
@@ -157,7 +172,6 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
 
         // vpravo: Dnes – svátek, kalendář, teď
         val right = panel()
-        val today = LocalDate.now()
         right.addView(c.label("DNES", C.BARO).apply { textSize = 9f })
         right.addView(c.text("Svátek: ${NameDays.forDate(c, today)}", 12f, C.WHITE, bold = true), c.lp(top = 2))
         right.addView(c.text("zítra: ${NameDays.forDate(c, today.plusDays(1))}", 9f, C.DIM))
@@ -178,9 +192,6 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             }
         }
         // teď
-        val f = ForecastFull.load(c)
-        val nowHour = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0)
-        val hours = f?.hours?.filter { !it.time.isBefore(nowHour) } ?: emptyList()
         hours.firstOrNull()?.let { h ->
             right.addView(View(c), c.lp(h = 0, weight = 1f))
             val r = c.hbox()
@@ -198,6 +209,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             right.addView(r)
         }
         row.addView(right, c.lp(0, c.dp(168), 1f))
+        }
         root.addView(row)
 
         // ---------- dole: předpověď 12 h + 10 dní ----------
@@ -237,7 +249,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         br.addView(dcol, c.lp(0, WRAP, 1f))
         bottom.addView(br)
         if (interactive) {
-            bottom.addView(c.text("← → záložky · OK otevřít · ↑ ↓ jas · Menu = nastavení", 8f, 0x66FFFFFF), c.lp(top = 2))
+            bottom.addView(c.text((if (MorningPrefs(c).scheduled()) "← → záložky · OK otevřít (na Přehledu: ranní / běžný pohled) · ↑ ↓ jas · Menu = nastavení" else "← → záložky · OK otevřít · ↑ ↓ jas · Menu = nastavení"), 8f, 0x66FFFFFF), c.lp(top = 2))
         }
         root.addView(bottom, c.lp(h = 0, weight = 1f, top = 8))
         return root

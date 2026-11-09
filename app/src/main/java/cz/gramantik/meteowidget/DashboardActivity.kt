@@ -83,7 +83,10 @@ class DashboardActivity : Activity() {
     /** Záložky: 0 Přehled, 1 Historie, 2 Předpověď, 3 Radar, 4 Nastavení. */
     private fun openTab(i: Int) {
         when (i) {
-            0 -> panel.refreshNow()
+            0 -> {
+                // ranní režim: OK přepne ranní ↔ běžný pohled
+                if (MorningPrefs(this).toggle()) panel.render() else panel.refreshNow()
+            }
             1, 2, 3 -> startActivity(
                 Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, i - 1)
             )

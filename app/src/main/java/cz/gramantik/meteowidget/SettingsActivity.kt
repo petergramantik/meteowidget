@@ -24,6 +24,7 @@ class SettingsActivity : Activity() {
     private lateinit var updateButton: Button
     private val numFields = ArrayList<Pair<EditText, (Float) -> Unit>>()
     private var scheduleSaver: (() -> Unit)? = null
+    private var morningSaver: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -236,6 +237,38 @@ class SettingsActivity : Activity() {
         hourWatcher(nightFrom) { tv.nightFrom = it }
         hourWatcher(nightTo) { tv.nightTo = it }
 
+        // ---------- televize: ranní režim ----------
+        val mp = MorningPrefs(this)
+        val tmMode = findViewById<Spinner>(R.id.tm_mode)
+        val modes = listOf("Vypnuto" to MorningPrefs.OFF, "Jen ráno (v nastaveném čase)" to MorningPrefs.MORNING,
+            "Celý den (pozdrav podle denní doby)" to MorningPrefs.ALL_DAY)
+        tmMode.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, modes.map { it.first })
+        tmMode.setSelection(modes.indexOfFirst { it.second == mp.mode }.coerceAtLeast(0))
+        tmMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, pos: Int, id: Long) {
+                mp.mode = modes[pos].second
+                MorningPrefs.dismissedUntil = 0L
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+        val tmFrom = findViewById<EditText>(R.id.tm_from)
+        val tmTo = findViewById<EditText>(R.id.tm_to)
+        val tmNames = findViewById<EditText>(R.id.tm_names)
+        tmFrom.setText(mp.from); tmTo.setText(mp.to); tmNames.setText(mp.names)
+        val saveMorning = {
+            MorningPrefs.parse(tmFrom.text.toString())?.let { mp.from = String.format("%02d:%02d", it.hour, it.minute) }
+            MorningPrefs.parse(tmTo.text.toString())?.let { mp.to = String.format("%02d:%02d", it.hour, it.minute) }
+            mp.names = tmNames.text.toString()
+        }
+        morningSaver = saveMorning
+        listOf(tmFrom, tmTo, tmNames).forEach { e -> e.setOnFocusChangeListener { _, has -> if (!has) saveMorning() } }
+        bindNum(R.id.tm_frost, mp.frostBelow) { mp.frostBelow = it }
+        bindNum(R.id.tm_wind, mp.windFrom) { mp.windFrom = it }
+        bindNum(R.id.tm_rain_mm, mp.rainMm) { mp.rainMm = it }
+        bindNum(R.id.tm_rain_pct, mp.rainPct) { mp.rainPct = it }
+
+        buildMenu()
+
         // ---------- uložit ----------
         val result = findViewById<TextView>(R.id.result)
         val button = findViewById<Button>(R.id.save)
@@ -256,6 +289,7 @@ class SettingsActivity : Activity() {
             lon.text.toString().replace(',', '.').toDoubleOrNull()?.let { prefs.lon = it }
             numFields.forEach { (e, set) -> e.text.toString().replace(',', '.').toFloatOrNull()?.let(set) }
             scheduleSaver?.invoke()
+            morningSaver?.invoke()
             Alerts.setRegion(this, region.text.toString())
             prefs.owmKey = owm.text.toString()
             prefs.mapyKey = mapy.text.toString()
@@ -299,6 +333,133 @@ class SettingsActivity : Activity() {
             }
         }
         walk(window.decorView)
+    }
+
+
+    // ---------- rozcestník podsekcí ----------
+    private data class Sec(val id: Int, val title: String, val status: () -> String)
+
+    private val sections by lazy {
+        listOf(
+            Sec(R.id.sec_keys, "🔑 Klíče a přístupy") { keysStatus() },
+            Sec(R.id.sec_station, "📟 Stanice a čidla") {
+                val np = NotifyPrefs(this)
+                "${prefs.channelName(Channel.IN)} / ${prefs.channelName(Channel.OUT)} · komfort " +
+                    "${np.humMin.toInt()}–${np.humMax.toInt()} % · ${np.tempMin.toInt()}–${np.tempMax.toInt()} °C"
+            },
+            Sec(R.id.sec_forecast, "📅 Předpověď a místo") {
+                (if (prefs.forecastSource == Prefs.SOURCE_GOOGLE) "Google" else "Open-Meteo") +
+                    " · ${prefs.locName} · výstrahy: ${Alerts.region(this).ifBlank { "vše" }}"
+            },
+            Sec(R.id.sec_notify, "🔔 Upozornění") {
+                val np = NotifyPrefs(this)
+                val on = listOf(np.frost, np.rain, np.wind, np.pressure, np.uv, np.alerts, np.hum).count { it }
+                if (on == 0) "vše vypnuto" else "zapnuto $on ze 7"
+            },
+            Sec(R.id.sec_tv, "📺 Televize") {
+                val mp = MorningPrefs(this)
+                (if (TvSchedule.startEnabled(this)) "start ${TvSchedule.startTime(this)}" else "bez plánu") +
+                    " · ranní režim: " + when (mp.mode) {
+                        MorningPrefs.ALL_DAY -> "celý den"
+                        MorningPrefs.MORNING -> "${mp.from}–${mp.to}"
+                        else -> "vypnuto"
+                    } + if (isTv() && !TvSchedule.canDrawOverlays(this)) " · ⚠ chybí povolení" else ""
+            },
+            Sec(R.id.sec_data, "🗄 Data a historie") {
+                (if (Battery.isUnrestricted(this)) "✅ sběr bez omezení" else "⚠ omezeno baterií") +
+                    " · ${MeteoDb.get(this).count()} záznamů"
+            },
+            Sec(R.id.sec_app, "ℹ Aplikace") {
+                val cur = Updater.currentVersion(this)
+                if (Updater.updateAvailable(this)) "Verze 1.$cur · ⬆ nová 1.${prefs.availableVersion}" else "Verze 1.$cur · aktuální"
+            },
+        )
+    }
+    private val menuRows = ArrayList<View>()
+    private val menuStatus = ArrayList<TextView>()
+    private var openSection: Int? = null
+
+    private fun keysStatus(): String {
+        val sp = getSharedPreferences("meteo", MODE_PRIVATE)
+        fun mark(k: String, filled: Boolean): String {
+            val st = sp.getString(k, "") ?: ""
+            return when {
+                !filled -> "—"
+                st.startsWith("✅") -> "✅"
+                st.startsWith("❌") -> "❌"
+                else -> "⚠"
+            }
+        }
+        return "Tuya ${mark("stTuya", prefs.isConfigured)} · Mapy ${mark("stMapy", prefs.mapyKey.isNotEmpty())} · " +
+            "OWM ${mark("stOwm", prefs.owmKey.isNotEmpty())} · Kalendář ${mark("stIcs", CalendarIcs.url(this).isNotEmpty())} · " +
+            "Google ${mark("stGoogle", prefs.googleKey.isNotEmpty())}"
+    }
+
+    private fun buildMenu() {
+        val box = findViewById<android.widget.LinearLayout>(R.id.sec_menu)
+        box.addView(TextView(this).apply {
+            text = "Nastavení"; textSize = 24f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, (8 * resources.displayMetrics.density).toInt())
+        })
+        val d = resources.displayMetrics.density
+        sections.forEach { sec ->
+            val st = TextView(this).apply { textSize = 13f; setTextColor(0xFF8A8A8A.toInt()) }
+            val row = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setPadding((14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt())
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(0x14888888); cornerRadius = 12 * d; setStroke((1 * d).toInt(), 0x33888888)
+                }
+                isClickable = true
+                isFocusable = true
+                addView(TextView(this@SettingsActivity).apply {
+                    text = sec.title; textSize = 17f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                })
+                addView(st)
+                setOnClickListener { showSection(sec.id) }
+            }
+            row.tvFocus(restoreStroke = 0x33888888, scale = 1.02f)
+            box.addView(row, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = (8 * d).toInt() })
+            menuRows.add(row)
+            menuStatus.add(st)
+        }
+        refreshMenu()
+    }
+
+    private fun refreshMenu() {
+        sections.forEachIndexed { i, sec ->
+            menuStatus.getOrNull(i)?.text = try { sec.status() } catch (e: Exception) { "" }
+        }
+    }
+
+    private fun showSection(id: Int?) {
+        currentFocus?.clearFocus() // uloží rozepsané pole (posluchači při ztrátě focusu)
+        openSection = id
+        findViewById<View>(R.id.sec_menu).visibility = if (id == null) View.VISIBLE else View.GONE
+        sections.forEach { findViewById<View>(it.id).visibility = if (it.id == id) View.VISIBLE else View.GONE }
+        findViewById<View>(R.id.sec_footer).visibility = if (id == null) View.GONE else View.VISIBLE
+        (findViewById<View>(R.id.sec_menu).parent.parent as? android.widget.ScrollView)?.scrollTo(0, 0)
+        if (id == null) {
+            refreshMenu()
+            if (isTv()) menuRows.getOrNull(sections.indexOfFirst { it.id == lastSection })?.requestFocus()
+        } else {
+            lastSection = id
+            if (isTv()) findViewById<View>(id).let { sec ->
+                sec.post { sec.focusSearch(View.FOCUS_DOWN)?.requestFocus() ?: sec.requestFocus(View.FOCUS_DOWN) }
+            }
+        }
+    }
+    private var lastSection: Int? = null
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (openSection != null) showSection(null)
+        else {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+        }
     }
 
     // ---------- přenos nastavení telefon -> box ----------
@@ -356,7 +517,7 @@ class SettingsActivity : Activity() {
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
         setupTvFocus()
-        if (isTv()) findViewById<View>(R.id.send_cfg)?.requestFocus()
+        if (isTv()) menuRows.firstOrNull()?.requestFocus()
     }
 
     override fun onDestroy() {
@@ -557,5 +718,6 @@ class SettingsActivity : Activity() {
             else "Sběr na pozadí: ⚠ omezeno optimalizací baterie – v noci mohou chybět data. " +
                 "Klepni níže a povol běh bez omezení. Na Samsungu zkontroluj i Péče o baterii → Uspané aplikace."
         if (::updateButton.isInitialized) refreshUpdateUi()
+        if (openSection == null && menuStatus.isNotEmpty()) refreshMenu()
     }
 }

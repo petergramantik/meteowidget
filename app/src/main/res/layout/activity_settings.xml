@@ -10,20 +10,10 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Aktualizace -->
-        <TextView
-            android:id="@+id/update_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <Button
-            android:id="@+id/update_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Zkontrolovat aktualizace" />
-
-        <TextView style="@style/Section" android:text="Klíče a přístupy" />
+        <!-- rozcestník – položky doplní kód -->
+        <LinearLayout android:id="@+id/sec_menu" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
+        <LinearLayout android:id="@+id/sec_keys" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <TextView style="@style/Section" android:textSize="22sp" android:text="🔑 Klíče a přístupy" />
 
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
             <Button android:id="@+id/send_cfg" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="📲 Poslat do TV" />
@@ -77,6 +67,9 @@
             <TextView android:id="@+id/eye_google" android:layout_width="wrap_content" android:layout_height="wrap_content" android:padding="10dp" android:text="👁" android:textSize="18sp" />
         </LinearLayout>
         <TextView android:id="@+id/st_google" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/sec_station" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <TextView style="@style/Section" android:textSize="22sp" android:text="📟 Stanice a čidla" />
         <TextView style="@style/Section" android:text="Názvy kanálů" />
 
         <TextView style="@style/Label" android:text="Hlavní stanice (vnitřní)" />
@@ -97,6 +90,34 @@
         <EditText android:id="@+id/name_s3" style="@style/Field" android:inputType="text" />
         <CheckBox android:id="@+id/indoor_3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Vnitřní čidlo (zobrazit komfortní zónu)" />
 
+        <TextView style="@style/Section" android:text="Komfortní zóna (doma a vnitřní čidla)" />
+
+        <CheckBox android:id="@+id/n_hum" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hlídat vlhkost doma (upozornění + pásmo v grafu)" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                <TextView style="@style/Label" android:text="Minimum (%)" />
+                <EditText android:id="@+id/n_hum_min" style="@style/Field" android:inputType="number" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
+                <TextView style="@style/Label" android:text="Maximum (%)" />
+                <EditText android:id="@+id/n_hum_max" style="@style/Field" android:inputType="number" />
+            </LinearLayout>
+        </LinearLayout>
+        <TextView style="@style/Label" android:layout_marginTop="10dp" android:text="Komfortní zóna teploty doma (°C)" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                <TextView style="@style/Label" android:text="Minimum (°C)" />
+                <EditText android:id="@+id/comf_t_min" style="@style/Field" android:inputType="numberDecimal|numberSigned" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
+                <TextView style="@style/Label" android:text="Maximum (°C)" />
+                <EditText android:id="@+id/comf_t_max" style="@style/Field" android:inputType="numberDecimal|numberSigned" />
+            </LinearLayout>
+        </LinearLayout>
+
+        </LinearLayout>
+        <LinearLayout android:id="@+id/sec_forecast" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <TextView style="@style/Section" android:textSize="22sp" android:text="📅 Předpověď a místo" />
         <TextView style="@style/Section" android:text="Předpověď na 10 dní" />
 
         <TextView style="@style/Label" android:text="Zdroj" />
@@ -140,32 +161,12 @@
             </LinearLayout>
         </LinearLayout>
 
-        <TextView style="@style/Section" android:text="Komfortní zóna (doma a vnitřní čidla)" />
-
-        <CheckBox android:id="@+id/n_hum" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hlídat vlhkost doma (upozornění + pásmo v grafu)" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                <TextView style="@style/Label" android:text="Minimum (%)" />
-                <EditText android:id="@+id/n_hum_min" style="@style/Field" android:inputType="number" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
-                <TextView style="@style/Label" android:text="Maximum (%)" />
-                <EditText android:id="@+id/n_hum_max" style="@style/Field" android:inputType="number" />
-            </LinearLayout>
+        <TextView style="@style/Section" android:text="Výstrahy ČHMÚ" />
+        <TextView style="@style/Label" android:text="Oblast výstrah (název ORP nebo okresu, např. Kyjov)" />
+        <EditText android:id="@+id/alert_region" style="@style/Field" android:inputType="text" />
         </LinearLayout>
-        <TextView style="@style/Label" android:layout_marginTop="10dp" android:text="Komfortní zóna teploty doma (°C)" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                <TextView style="@style/Label" android:text="Minimum (°C)" />
-                <EditText android:id="@+id/comf_t_min" style="@style/Field" android:inputType="numberDecimal|numberSigned" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
-                <TextView style="@style/Label" android:text="Maximum (°C)" />
-                <EditText android:id="@+id/comf_t_max" style="@style/Field" android:inputType="numberDecimal|numberSigned" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <TextView style="@style/Section" android:text="Upozornění" />
+        <LinearLayout android:id="@+id/sec_notify" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <TextView style="@style/Section" android:textSize="22sp" android:text="🔔 Upozornění" />
 
         <CheckBox android:id="@+id/n_frost" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Mráz – teplota venku pod (°C):" />
         <EditText android:id="@+id/n_frost_lim" style="@style/Field" android:inputType="numberDecimal|numberSigned" />
@@ -182,33 +183,10 @@
         <EditText android:id="@+id/n_uv_lim" style="@style/Field" android:inputType="numberDecimal" />
 
         <CheckBox android:id="@+id/n_alerts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Výstrahy ČHMÚ" />
-        <TextView style="@style/Label" android:text="Oblast výstrah (název ORP nebo okresu, např. Kyjov)" />
-        <EditText android:id="@+id/alert_region" style="@style/Field" android:inputType="text" />
 
-        <TextView style="@style/Section" android:text="Historie" />
-        <TextView
-            android:id="@+id/battery_status"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-        <Button
-            android:id="@+id/battery_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Nastavení baterie aplikace" />
-        <Button
-            android:id="@+id/backfill"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Znovu doplnit historii z Tuya (7 dní)" />
-        <TextView
-            android:id="@+id/backfill_result"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:textIsSelectable="true"
-            android:textSize="12sp" />
-
+        </LinearLayout>
+        <LinearLayout android:id="@+id/sec_tv" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <TextView style="@style/Section" android:textSize="22sp" android:text="📺 Televize" />
         <TextView style="@style/Section" android:text="Televize – plánované spuštění" />
 
         <CheckBox android:id="@+id/tv_start_on" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Každý den spustit panel v (HH:MM):" />
@@ -296,6 +274,91 @@
             style="@style/Label"
             android:text="Na panelu v televizi mění jas i šipky nahoru/dolů. OK = nastavení, šipka doprava = obnovit." />
 
+        <!-- ranní režim – doplní kód -->
+        <LinearLayout android:id="@+id/tv_morning_box" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+        <TextView style="@style/Section" android:text="Televize – ranní režim" />
+        <TextView style="@style/Label" android:text="Místo dlaždic a panelu Dnes ukáže pozdrav, dnešní kalendář a na co si dát pozor. Po 18:00 se kalendář i upozornění přepnou na zítřek. OK na záložce Přehled přepne na běžný pohled a zpět." />
+        <TextView style="@style/Label" android:text="Režim" />
+        <Spinner android:id="@+id/tm_mode" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView style="@style/Label" android:text="Ráno od (HH:MM)" />
+                <EditText android:id="@+id/tm_from" style="@style/Field" android:inputType="time" android:maxLength="5" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView style="@style/Label" android:text="Ráno do (HH:MM)" />
+                <EditText android:id="@+id/tm_to" style="@style/Field" android:inputType="time" android:maxLength="5" />
+            </LinearLayout>
+        </LinearLayout>
+        <TextView style="@style/Label" android:text="Oslovení (aplikace doplní „Dobré ráno, …“)" />
+        <EditText android:id="@+id/tm_names" style="@style/Field" android:inputType="textCapWords" />
+        <TextView style="@style/Label" android:text="Prahy upozornění" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView style="@style/Label" android:text="Mráz pod (°C)" />
+                <EditText android:id="@+id/tm_frost" style="@style/Field" android:inputType="numberSigned|numberDecimal" android:maxLength="5" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView style="@style/Label" android:text="Vítr od (km/h)" />
+                <EditText android:id="@+id/tm_wind" style="@style/Field" android:inputType="number" android:maxLength="3" />
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView style="@style/Label" android:text="Déšť od (mm)" />
+                <EditText android:id="@+id/tm_rain_mm" style="@style/Field" android:inputType="numberDecimal" android:maxLength="4" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView style="@style/Label" android:text="nebo pravděp. od (%)" />
+                <EditText android:id="@+id/tm_rain_pct" style="@style/Field" android:inputType="number" android:maxLength="3" />
+            </LinearLayout>
+        </LinearLayout>
+        </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/sec_data" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <TextView style="@style/Section" android:textSize="22sp" android:text="🗄 Data a historie" />
+        <TextView style="@style/Section" android:text="Historie" />
+        <TextView
+            android:id="@+id/battery_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp" />
+        <Button
+            android:id="@+id/battery_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nastavení baterie aplikace" />
+        <Button
+            android:id="@+id/backfill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Znovu doplnit historii z Tuya (7 dní)" />
+        <TextView
+            android:id="@+id/backfill_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
+
+        </LinearLayout>
+        <LinearLayout android:id="@+id/sec_app" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+        <TextView style="@style/Section" android:textSize="22sp" android:text="ℹ Aplikace" />
+        <!-- Aktualizace -->
+        <TextView
+            android:id="@+id/update_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/update_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Zkontrolovat aktualizace" />
+
+        </LinearLayout>
+        <LinearLayout android:id="@+id/sec_footer" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
         <Button
             android:id="@+id/save"
             android:layout_width="match_parent"
@@ -311,5 +374,6 @@
             android:fontFamily="monospace"
             android:textIsSelectable="true"
             android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

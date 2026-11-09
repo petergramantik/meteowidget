@@ -49,7 +49,6 @@ object Sync {
                 p.lastError = e.message ?: e.javaClass.simpleName
             }
             if (heavy) {
-                backfillPressure(ctx, p, client)
                 try {
                     HistoryBackfill.runIfNeeded(ctx, p, client)
                 } catch (e: Exception) {

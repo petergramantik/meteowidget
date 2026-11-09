@@ -14,35 +14,16 @@ object PressureHistory {
     private const val KEEP = 26 * 3_600_000L
     private const val HOUR = 3_600_000L
 
+    /** Historie tlaku z hlavní databáze (stejná data jako v aplikaci, včetně doplnění z Tuya). */
     fun load(ctx: Context): List<Pair<Long, Double>> {
-        val s = ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE).getString("pHist", null)
-            ?: return emptyList()
-        return try {
-            val a = JSONArray(s)
-            (0 until a.length()).map { a.getJSONArray(it).let { e -> e.getLong(0) to e.getDouble(1) } }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    private fun save(ctx: Context, list: List<Pair<Long, Double>>) {
-        val a = JSONArray()
-        list.forEach { a.put(JSONArray().put(it.first).put(it.second)) }
-        ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE).edit().putString("pHist", a.toString()).apply()
-    }
-
-    /** Přidá body, seřadí, ořízne staré a zředí na max. 1 bod / 10 min. */
-    fun add(ctx: Context, points: List<Pair<Long, Double>>) {
         val now = System.currentTimeMillis()
-        val all = (load(ctx) + points)
-            .filter { now - it.first < KEEP && it.second in 850.0..1100.0 }
-            .sortedBy { it.first }
-        val thinned = ArrayList<Pair<Long, Double>>()
-        for (pt in all) {
-            if (thinned.isEmpty() || pt.first - thinned.last().first >= 10 * 60_000L) thinned.add(pt)
-        }
-        save(ctx, thinned)
+        return MeteoDb.get(ctx).range(now - KEEP, now, maxPoints = 400)
+            .mapNotNull { s -> s.pres?.let { s.t to it } }
     }
+
+    /** Dřív samostatná historie – teď se tlak ukládá jen do databáze. */
+    @Suppress("UNUSED_PARAMETER")
+    fun add(ctx: Context, points: List<Pair<Long, Double>>) = Unit
 
     /** Je historie krátká? (pak má smysl dotáhnout ji z Tuya) */
     fun needsBackfill(ctx: Context): Boolean {

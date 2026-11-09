@@ -30,6 +30,33 @@ object TvSchedule {
     fun stopEnabled(ctx: Context) = sp(ctx).getBoolean("tvStopOn", false)
     fun stopTime(ctx: Context) = sp(ctx).getString("tvStopTime", "23:00") ?: "23:00"
     fun bootStart(ctx: Context) = sp(ctx).getBoolean("tvBootStart", false)
+    /** spouštět jen v pracovní dny (mimo víkendy a státní svátky) */
+    fun workdaysOnly(ctx: Context) = sp(ctx).getBoolean("tvWorkdays", false)
+    fun setWorkdaysOnly(ctx: Context, v: Boolean) { sp(ctx).edit().putBoolean("tvWorkdays", v).apply(); reschedule(ctx) }
+    /** automatické zavření panelu spuštěného budíkem (minuty, 0 = nezavírat) */
+    fun autoCloseMin(ctx: Context) = sp(ctx).getInt("tvAutoClose", 30)
+    fun setAutoCloseMin(ctx: Context, v: Int) = sp(ctx).edit().putInt("tvAutoClose", v.coerceIn(0, 24 * 60)).apply()
+
+    /** Státní svátek v ČR (včetně Velkého pátku a Velikonočního pondělí). */
+    fun isCzHoliday(d: java.time.LocalDate): Boolean {
+        val fixed = setOf(101, 501, 508, 705, 706, 928, 1028, 1117, 1224, 1225, 1226)
+        if (d.monthValue * 100 + d.dayOfMonth in fixed) return true
+        val easter = easterSunday(d.year)
+        return d == easter.minusDays(2) || d == easter.plusDays(1)
+    }
+
+    /** Velikonoční neděle (gregoriánský výpočet). */
+    private fun easterSunday(y: Int): java.time.LocalDate {
+        val a = y % 19; val b = y / 100; val c = y % 100
+        val d = b / 4; val e = b % 4; val f = (b + 8) / 25; val g = (b - f + 1) / 3
+        val h = (19 * a + b - d - g + 15) % 30; val i = c / 4; val k = c % 4
+        val l = (32 + 2 * e + 2 * i - h - k) % 7; val m = (a + 11 * h + 22 * l) / 451
+        val month = (h + l - 7 * m + 114) / 31; val day = (h + l - 7 * m + 114) % 31 + 1
+        return java.time.LocalDate.of(y, month, day)
+    }
+
+    private fun isWorkday(d: java.time.LocalDate) =
+        d.dayOfWeek != java.time.DayOfWeek.SATURDAY && d.dayOfWeek != java.time.DayOfWeek.SUNDAY && !isCzHoliday(d)
 
     fun save(ctx: Context, startOn: Boolean, start: String, stopOn: Boolean, stop: String, boot: Boolean) {
         sp(ctx).edit()
@@ -49,14 +76,26 @@ object TvSchedule {
         return String.format("%02d:%02d", h, m)
     }
 
-    private fun nextAt(time: String): Long {
+    private fun nextAt(time: String, workdays: Boolean = false): Long {
         val (h, m) = time.split(':').map { it.toInt() }
         val c = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, h); set(Calendar.MINUTE, m); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }
         if (c.timeInMillis <= System.currentTimeMillis() + 5_000) c.add(Calendar.DAY_OF_YEAR, 1)
+        if (workdays) {
+            // přeskočit víkendy a svátky
+            var guard = 0
+            while (guard++ < 14) {
+                val d = java.time.LocalDate.of(c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH))
+                if (isWorkday(d)) break
+                c.add(Calendar.DAY_OF_YEAR, 1)
+            }
+        }
         return c.timeInMillis
     }
+
+    /** Čas příštího automatického spuštění (pro zobrazení v nastavení), nebo null. */
+    fun nextStart(ctx: Context): Long? = if (startEnabled(ctx)) nextAt(startTime(ctx), workdaysOnly(ctx)) else null
 
     private fun startIntent(ctx: Context, req: Int): PendingIntent {
         val i = Intent(ctx, DashboardActivity::class.java)
@@ -89,12 +128,21 @@ object TvSchedule {
         val am = am(ctx)
         am.cancel(startIntent(ctx, REQ_START))
         am.cancel(stopIntent(ctx))
-        if (startEnabled(ctx)) setStartAlarm(ctx, nextAt(startTime(ctx)), REQ_START)
+        if (startEnabled(ctx)) setStartAlarm(ctx, nextAt(startTime(ctx), workdaysOnly(ctx)), REQ_START)
         if (stopEnabled(ctx)) {
             val at = nextAt(stopTime(ctx))
             if (canExact(ctx)) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, stopIntent(ctx))
             else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, stopIntent(ctx))
         }
+    }
+
+    /** Zkouška automatického vypnutí: otevře panel, který se za 1 minutu zavře. */
+    fun testAutoClose(ctx: Context) {
+        ctx.startActivity(
+            Intent(ctx, DashboardActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(DashboardActivity.EXTRA_AUTOCLOSE_MIN, 1)
+        )
     }
 
     /** Zkušební spuštění za 2 minuty. */

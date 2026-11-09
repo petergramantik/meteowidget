@@ -179,6 +179,26 @@ class SettingsActivity : Activity() {
         scheduleSaver = saveSchedule
         listOf(tvStartOn, tvStopOn, tvBoot).forEach { it.setOnCheckedChangeListener { _, _ -> saveSchedule() } }
         listOf(tvStart, tvStop).forEach { e -> e.setOnFocusChangeListener { _, has -> if (!has) saveSchedule() } }
+        val workdays = findViewById<CheckBox>(R.id.tv_workdays)
+        val nextStart = findViewById<TextView>(R.id.tv_next_start)
+        fun showNext() {
+            nextStart.text = TvSchedule.nextStart(this)?.let {
+                "Příští spuštění: " + java.text.SimpleDateFormat("EEEE d. M. HH:mm", java.util.Locale("cs", "CZ")).format(java.util.Date(it))
+            } ?: ""
+        }
+        workdays.isChecked = TvSchedule.workdaysOnly(this)
+        workdays.setOnCheckedChangeListener { _, on -> TvSchedule.setWorkdaysOnly(this, on); showNext() }
+        listOf(tvStartOn, tvStopOn, tvBoot).forEach { cb ->
+            cb.setOnCheckedChangeListener { _, _ -> saveSchedule(); showNext() }
+        }
+        showNext()
+        bindNum(R.id.tv_autoclose, TvSchedule.autoCloseMin(this).toFloat()) { TvSchedule.setAutoCloseMin(this, it.toInt()) }
+        findViewById<Button>(R.id.tv_autoclose_test).setOnClickListener {
+            numFields.forEach { (e, set) -> e.text.toString().replace(',', '.').toFloatOrNull()?.let(set) }
+            TvSchedule.testAutoClose(this)
+            android.widget.Toast.makeText(this, "Panel se za 1 minutu zavře. Nech ovladač ležet – box pak usne podle svého nastavení.",
+                android.widget.Toast.LENGTH_LONG).show()
+        }
         findViewById<Button>(R.id.tv_overlay_btn).setOnClickListener {
             if (!TvSchedule.requestOverlay(this)) {
                 findViewById<TextView>(R.id.tv_overlay_status).text =

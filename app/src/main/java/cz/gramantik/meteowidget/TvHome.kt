@@ -135,9 +135,9 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         val lr = c.hbox(Gravity.TOP)
         val hasSensors = w != null && listOf(Channel.S1, Channel.S2, Channel.S3).any { w.temp(it.tempCode) != null }
         fun col(name: String, temp: Double?, hum: Int?, color: Int, end: Boolean) = c.vbox(if (end) Gravity.END else Gravity.START).apply {
-            addView(c.label(name))
+            addView(c.label(name), c.lp(WRAP, WRAP))
             addView(c.text(t(temp), if (hasSensors) 34f else 40f, color, condensed = true), c.lp(WRAP, WRAP, top = 2))
-            addView(c.text(Weather.h(hum), if (hasSensors) 15f else 17f, color, condensed = true))
+            addView(c.text(Weather.h(hum), if (hasSensors) 15f else 17f, color, condensed = true), c.lp(WRAP, WRAP))
         }
         lr.addView(col(p.channelName(Channel.IN), w?.tempIn, w?.humIn, C.IN, false), c.lp(0, WRAP, 1f))
         lr.addView(col(p.channelName(Channel.OUT), w?.tempOut, w?.humOut, C.OUT, true), c.lp(0, WRAP, 1f))

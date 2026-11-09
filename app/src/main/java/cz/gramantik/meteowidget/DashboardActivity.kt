@@ -47,6 +47,7 @@ class DashboardActivity : Activity() {
             window.decorView.systemUiVisibility = (android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
                 android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
         }
+        armAutoClose(intent)
         if (!Prefs(this).isConfigured) {
             show("Nejdřív zadej údaje z Tuya – otevírám nastavení")
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -65,6 +66,7 @@ class DashboardActivity : Activity() {
 
     override fun onDestroy() {
         if (TvSchedule.running?.get() === this) TvSchedule.running = null
+        countdownHandler.removeCallbacks(countdown)
         panel.release()
         super.onDestroy()
     }
@@ -74,8 +76,56 @@ class DashboardActivity : Activity() {
         toast = Toast.makeText(this, msg, Toast.LENGTH_SHORT).also { it.show() }
     }
 
+    // ---------- automatické zavření po spuštění budíkem ----------
+    private var autoCloseAt = 0L
+    private val countdownHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val countdown = object : Runnable {
+        override fun run() {
+            if (autoCloseAt == 0L) { panel.setCountdown(null); return }
+            val left = autoCloseAt - System.currentTimeMillis()
+            if (left <= 0) {
+                panel.setCountdown(null)
+                autoCloseAt = 0L
+                finish() // box pak usne podle svého nastavení (a přes HDMI-CEC zhasne TV)
+                return
+            }
+            val s = (left / 1000).toInt()
+            panel.setCountdown(if (left <= 5 * 60_000L) String.format("⏻ Vypnu za %d:%02d", s / 60, s % 60) else null)
+            countdownHandler.postDelayed(this, 1000)
+        }
+    }
+
+    private fun armAutoClose(i: Intent?) {
+        val min = when {
+            i == null -> 0
+            i.hasExtra(EXTRA_AUTOCLOSE_MIN) -> i.getIntExtra(EXTRA_AUTOCLOSE_MIN, 0)
+            i.getBooleanExtra(EXTRA_SCHEDULED, false) -> TvSchedule.autoCloseMin(this)
+            else -> 0
+        }
+        if (min <= 0) return
+        autoCloseAt = System.currentTimeMillis() + min * 60_000L
+        countdownHandler.removeCallbacks(countdown)
+        countdownHandler.post(countdown)
+        panel.showHint("Panel se sám zavře za $min min · stiskem ovladače to zrušíš")
+    }
+
+    private fun cancelAutoClose() {
+        if (autoCloseAt == 0L) return
+        autoCloseAt = 0L
+        countdownHandler.removeCallbacks(countdown)
+        panel.setCountdown(null)
+        show("Automatické vypnutí zrušeno")
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        armAutoClose(intent)
+    }
+
     companion object {
         const val EXTRA_SCHEDULED = "scheduled"
+        const val EXTRA_AUTOCLOSE_MIN = "autoCloseMin"
     }
 
     private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java))
@@ -99,6 +149,7 @@ class DashboardActivity : Activity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
         panel.lastInput = System.currentTimeMillis()
+        cancelAutoClose()
         val tabs = panel.home.tabViews
         when (event.keyCode) {
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> { openSettings(); return true }

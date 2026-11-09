@@ -84,8 +84,32 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
         addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fit() }
     }
 
+    private val countdownView = android.widget.TextView(ctx).apply {
+        textSize = 15f
+        setTextColor(0xFFFFD54F.toInt())
+        val d = ctx.resources.displayMetrics.density
+        setPadding((12 * d).toInt(), (6 * d).toInt(), (12 * d).toInt(), (6 * d).toInt())
+        background = android.graphics.drawable.GradientDrawable().apply { setColor(0xCC171B21.toInt()); cornerRadius = 14 * d }
+        visibility = View.GONE
+    }
+
+    /** Odpočet automatického vypnutí v pravém horním rohu (null = skrýt). */
+    fun setCountdown(text: String?) {
+        if (countdownView.parent == null) {
+            val d = ctx.resources.displayMetrics.density
+            root.addView(countdownView, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.TOP or android.view.Gravity.END).apply {
+                topMargin = (40 * d).toInt(); marginEnd = (24 * d).toInt()
+            })
+        }
+        countdownView.visibility = if (text == null) View.GONE else View.VISIBLE
+        if (text != null) countdownView.text = text
+    }
+
     /** Krátká nápověda ovládání po spuštění. */
+    private var hintView: View? = null
+
     fun showHint(text: String) {
+        hintView?.let { root.removeView(it) }
         val d = ctx.resources.displayMetrics.density
         val hint = android.widget.TextView(ctx).apply {
             this.text = text
@@ -97,7 +121,8 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
         root.addView(hint, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL).apply {
             bottomMargin = (24 * d).toInt()
         })
-        handler.postDelayed({ root.removeView(hint) }, 6_000)
+        hintView = hint
+        handler.postDelayed({ root.removeView(hint); if (hintView === hint) hintView = null }, 6_000)
     }
 
     /** poslední stisk ovladače – po 5 min bez ovládání se Zítra vrátí na Dnes */

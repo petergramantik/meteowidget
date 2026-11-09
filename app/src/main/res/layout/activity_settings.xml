@@ -193,6 +193,11 @@
         <EditText android:id="@+id/tv_start_time" style="@style/Field" android:inputType="time" />
         <CheckBox android:id="@+id/tv_stop_on" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Každý den zavřít panel v (HH:MM):" />
         <EditText android:id="@+id/tv_stop_time" style="@style/Field" android:inputType="time" />
+        <CheckBox android:id="@+id/tv_workdays" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Mimo víkendy a svátky (spouštět jen v pracovní dny)" />
+        <TextView android:id="@+id/tv_next_start" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" android:textColor="#666666" />
+        <TextView style="@style/Label" android:text="Automaticky zavřít panel po spuštění budíkem (minut, 0 = nezavírat). Stisk ovladače zavření zruší." />
+        <EditText android:id="@+id/tv_autoclose" style="@style/Field" android:inputType="number" android:maxLength="4" />
+        <Button android:id="@+id/tv_autoclose_test" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Otestovat automatické vypnutí (za 1 minutu)" />
         <CheckBox android:id="@+id/tv_boot" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Spustit panel po zapnutí boxu" />
         <TextView android:id="@+id/tv_overlay_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textSize="13sp" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">

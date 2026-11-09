@@ -42,8 +42,17 @@ class MainActivity : Activity() {
     private lateinit var title: TextView
     private lateinit var refreshBtn: ImageView
 
+    /** Na televizi se bez konkrétní záložky otevře televizní panel. */
+    private fun openTvPanelIfNeeded(i: Intent?): Boolean {
+        if (!isTv() || i?.hasExtra(EXTRA_TAB) == true) return false
+        startActivity(Intent(this, DashboardActivity::class.java))
+        finish()
+        return true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null && openTvPanelIfNeeded(intent)) return
         window.statusBarColor = C.BG
         window.navigationBarColor = C.BG
 
@@ -116,6 +125,7 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (openTvPanelIfNeeded(intent)) return
         if (intent.hasExtra(EXTRA_TAB)) {
             show(intent.getIntExtra(EXTRA_TAB, 0))
             if (isTv()) tabs[current].requestFocus()

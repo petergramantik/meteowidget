@@ -187,7 +187,19 @@ fun View.tvFocus(restoreStroke: Int = C.LINE, scale: Float = 1.05f): View {
     return this
 }
 
-/** Běží aplikace na televizi? */
-fun Context.isTv(): Boolean =
-    (getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager).currentModeType ==
-        android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+/**
+ * Běží aplikace na televizi? Systémový TV režim / Android TV, nebo zařízení bez dotykové
+ * obrazovky s displejem na šířku (TV boxy, které se jako televize nehlásí – např. O2 TV Box).
+ */
+fun Context.isTv(): Boolean {
+    val ui = (getSystemService(Context.UI_MODE_SERVICE) as android.app.UiModeManager).currentModeType
+    if (ui == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) return true
+    val pm = packageManager
+    if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) return true
+    @Suppress("DEPRECATION")
+    if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)) return true
+    val noTouch = !pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN) ||
+        resources.configuration.touchscreen == android.content.res.Configuration.TOUCHSCREEN_NOTOUCH
+    val dm = resources.displayMetrics
+    return noTouch && dm.widthPixels >= dm.heightPixels
+}

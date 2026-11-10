@@ -125,9 +125,35 @@ object HistoryBackfill {
      * Doplní mezeru v historii (např. když telefon v noci uspal aplikaci).
      * Každou mezeru zkusí jen jednou.
      */
+    /**
+     * Najde mezery v historii za posledních 7 dní a zkusí je doplnit z Tuya.
+     * Každá mezera max. 4 pokusy s odstupem 20 min (Tuya data po výpadku dohání se zpožděním).
+     */
+    fun fillGaps(ctx: Context, p: Prefs, client: TuyaClient): Int {
+        val now = System.currentTimeMillis()
+        val gaps = MeteoDb.get(ctx).gaps(now - 7 * 24 * 3600_000L, now, 30 * 60_000L)
+        val tries = try { JSONObject(sp(ctx).getString("gapTries", "{}")!!) } catch (e: Exception) { JSONObject() }
+        // staré záznamy pryč
+        tries.keys().asSequence().toList().forEach { k -> if ((k.toLongOrNull() ?: 0) < now - 8 * 24 * 3600_000L) tries.remove(k) }
+        var filled = 0
+        var calls = 0
+        for ((from, to) in gaps.sortedByDescending { it.first }) {
+            if (calls >= 3) break // šetrně k limitům Tuya
+            val key = from.toString()
+            val rec = tries.optJSONObject(key) ?: JSONObject()
+            val n = rec.optInt("n", 0)
+            val last = rec.optLong("t", 0)
+            if (n >= 4 || now - last < 20 * 60_000L) continue
+            calls++
+            val got = fillGap(ctx, p, client, from, to)
+            filled += got
+            tries.put(key, JSONObject().put("n", if (got > 0) 4 else n + 1).put("t", now))
+        }
+        sp(ctx).edit().putString("gapTries", tries.toString()).apply()
+        return filled
+    }
+
     fun fillGap(ctx: Context, p: Prefs, client: TuyaClient, from: Long, to: Long): Int {
-        if (sp(ctx).getLong("gapTried", 0) == from) return 0
-        sp(ctx).edit().putLong("gapTried", from).apply()
         return try {
             var logs = client.fetchReportLogsMulti(CODES, from, to, maxPages = 15)
             if (logs.isEmpty()) logs = client.fetchLogsV1Multi(CODES, from, to, maxPages = 15)

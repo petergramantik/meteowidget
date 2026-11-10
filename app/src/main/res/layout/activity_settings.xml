@@ -199,6 +199,7 @@
         <EditText android:id="@+id/tv_autoclose" style="@style/Field" android:inputType="number" android:maxLength="4" />
         <CheckBox android:id="@+id/tv_sleep" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Po automatickém zavření uspat box (vypne i televizi přes HDMI-CEC)" />
         <TextView android:id="@+id/tv_sleep_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" android:textColor="#666666" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" android:textColor="#666666" android:text="V Usnadnění sjeď dolů do části Služby → Meteostanice – uspání → zapnout." />
         <Button android:id="@+id/tv_sleep_a11y_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Povolit uspání přes Usnadnění" />
         <Button android:id="@+id/tv_sleep_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Povolit přes Správu zařízení (záloha)" />
         <Button android:id="@+id/tv_autoclose_test" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Otestovat automatické vypnutí (za 1 minutu)" />

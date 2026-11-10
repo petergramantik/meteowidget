@@ -164,6 +164,20 @@ class MeteoDb private constructor(ctx: Context) :
         "SELECT t, ${Sample.COLS.joinToString(",")} FROM samples ORDER BY t DESC LIMIT 1", null
     ).use { if (it.moveToFirst()) it.sample() else null }
 
+    /** Mezery delší než [minGap] mezi po sobě jdoucími záznamy v intervalu (začátek, konec). */
+    fun gaps(from: Long, to: Long, minGap: Long): List<Pair<Long, Long>> {
+        val out = ArrayList<Pair<Long, Long>>()
+        readableDatabase.rawQuery("SELECT t FROM samples WHERE t >= ? AND t <= ? ORDER BY t", arrayOf(from.toString(), to.toString())).use {
+            var prev = -1L
+            while (it.moveToNext()) {
+                val t = it.getLong(0)
+                if (prev > 0 && t - prev > minGap) out += prev to t
+                prev = t
+            }
+        }
+        return out
+    }
+
     fun first(): Long? = readableDatabase.rawQuery("SELECT MIN(t) FROM samples", null)
         .use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null }
 

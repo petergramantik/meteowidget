@@ -31,16 +31,16 @@ object Sync {
                 val w = Weather(data, p.spec)
                 w.pressure?.let { PressureHistory.add(ctx, listOf(t to it)) }
                 val prev = db.last()
-                // mezera v historii (telefon uspal aplikaci) -> zkusit doplnit z Tuya
-                if (heavy && prev != null && t - prev.t > 30 * 60_000L) {
-                    try {
-                        HistoryBackfill.fillGap(ctx, p, client, prev.t, t)
-                    } catch (e: Exception) {
-                        // nevadí
-                    }
-                }
                 // do historie nejvýš 1 záznam za 5 minut
                 if (prev == null || t - prev.t > 5 * 60_000L) db.insert(Sample.from(t, w))
+                // mezery v historii (uspaný telefon, restart routeru) -> opakovaně zkusit doplnit z Tuya
+                if (heavy) {
+                    try {
+                        HistoryBackfill.fillGaps(ctx, p, client)
+                    } catch (e: Exception) {
+                        // nevadí, zkusí se příště
+                    }
+                }
                 try {
                     Notify.checkStation(ctx, w, prev)
                 } catch (e: Exception) {
@@ -120,6 +120,8 @@ class FetchWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
 
     override fun doWork(): Result {
         Sync.run(applicationContext)
+        // nepovedlo se (výpadek sítě) -> zkusit znovu hned po obnovení internetu
+        if (Prefs(applicationContext).lastError != null) retryWhenOnline(applicationContext)
         return Result.success()
     }
 
@@ -138,6 +140,15 @@ class FetchWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) 
                 .build()
             WorkManager.getInstance(ctx)
                 .enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, req)
+        }
+
+        /** Jednorázový pokus, který WorkManager spustí, jakmile je zase internet (nejdřív za 2 min). */
+        fun retryWhenOnline(ctx: Context) {
+            val req = androidx.work.OneTimeWorkRequestBuilder<FetchWorker>()
+                .setConstraints(constraints)
+                .setInitialDelay(2, TimeUnit.MINUTES)
+                .build()
+            WorkManager.getInstance(ctx).enqueueUniqueWork("meteo_retry", ExistingWorkPolicy.KEEP, req)
         }
 
         fun refreshNow(ctx: Context) {

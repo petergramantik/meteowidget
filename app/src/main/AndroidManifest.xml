@@ -110,7 +110,7 @@
 
         <service
             android:name=".SleepA11yService"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/a11y_sleep_label"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>

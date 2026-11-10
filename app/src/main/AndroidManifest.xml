@@ -108,6 +108,12 @@
             android:name=".TvAlarmReceiver"
             android:exported="false" />
 
+        <activity
+            android:name=".BlackActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
         <service
             android:name=".SleepA11yService"
             android:exported="true"

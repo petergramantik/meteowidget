@@ -87,7 +87,10 @@ class DashboardActivity : Activity() {
                 panel.setCountdown(null)
                 autoCloseAt = 0L
                 // uspat box (zhasnutí obrazovky) – jinak by se ukázalo hlavní rozhraní boxu
-                if (SleepAdmin.enabled(this@DashboardActivity)) SleepAdmin.sleepNow(this@DashboardActivity)
+                if (SleepAdmin.enabled(this@DashboardActivity) && !SleepAdmin.sleepNow(this@DashboardActivity)) {
+                    // nejde uspat přímo -> černá obrazovka, box usne podle svého časovače
+                    startActivity(android.content.Intent(this@DashboardActivity, BlackActivity::class.java))
+                }
                 finish() // jinak box usne podle svého nastavení (a přes HDMI-CEC zhasne TV)
                 return
             }

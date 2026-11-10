@@ -98,7 +98,7 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
         if (countdownView.parent == null) {
             val d = ctx.resources.displayMetrics.density
             root.addView(countdownView, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.TOP or android.view.Gravity.END).apply {
-                topMargin = (40 * d).toInt(); marginEnd = (24 * d).toInt()
+                topMargin = (48 * d).toInt(); marginEnd = (56 * d).toInt()
             })
         }
         countdownView.visibility = if (text == null) View.GONE else View.VISIBLE
@@ -119,7 +119,7 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
             background = android.graphics.drawable.GradientDrawable().apply { setColor(0xCC171B21.toInt()); cornerRadius = 18 * d }
         }
         root.addView(hint, FrameLayout.LayoutParams(-2, -2, android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL).apply {
-            bottomMargin = (24 * d).toInt()
+            bottomMargin = (48 * d).toInt()
         })
         hintView = hint
         handler.postDelayed({ root.removeView(hint); if (hintView === hint) hintView = null }, 6_000)
@@ -229,7 +229,7 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
         val d = ctx.resources.displayMetrics.density
         val cw = 640 * d
         val ch = 360 * d
-        val scale = minOf(w / cw, h / ch)
+        val scale = minOf(w / cw, h / ch) * 0.97f // bezpečná zóna – televize obraz po okrajích ořezávají
         child.pivotX = 0f
         child.pivotY = 0f
         child.scaleX = scale

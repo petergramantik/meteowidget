@@ -388,7 +388,8 @@ class SettingsActivity : Activity() {
             a11y || admin -> "Povoleno $how – zapni přepínač výše"
             android.os.Build.VERSION.SDK_INT >= 28 -> "⚠ Uspání zatím není povolené – klikni na „Povolit uspání přes Usnadnění“"
             else -> "⚠ Uspání zatím není povolené – klikni na „Povolit přes Správu zařízení“"
-        }
+        } + if (!(a11y || admin) && SleepAdmin.enabled(this))
+            "\nBez povolení: po zavření se ukáže černá obrazovka a box usne podle svého časovače spánku." else ""
         findViewById<View>(R.id.tv_sleep_a11y_btn)?.visibility =
             if (a11y || android.os.Build.VERSION.SDK_INT < 28) View.GONE else View.VISIBLE
         findViewById<View>(R.id.tv_sleep_btn)?.visibility = if (a11y || admin) View.GONE else View.VISIBLE

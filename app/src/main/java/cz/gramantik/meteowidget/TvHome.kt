@@ -93,7 +93,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         val w = p.lastData?.let { Weather(it, p.spec) }
         val root = c.vbox().apply {
             setBackgroundColor(Color.BLACK)
-            setPadding(c.dp(16), c.dp(10), c.dp(16), c.dp(8))
+            setPadding(c.dp(16), c.dp(10), c.dp(16), c.dp(16)) // spodní okraj kvůli přesahu obrazu TV
             layoutParams = LinearLayout.LayoutParams(c.dp(640), c.dp(360))
         }
 

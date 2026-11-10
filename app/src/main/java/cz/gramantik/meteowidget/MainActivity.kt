@@ -158,11 +158,51 @@ class MainActivity : Activity() {
         title.text = listOf("Stanice", "Předpověď", "Radar")[i]
     }
 
+    /**
+     * TV: šipky ← → přepínají karty odkudkoli. Výjimka: posuvník a řada prvků vedle sebe –
+     * tam se nejdřív posouvá výběr a karta se přepne až na okraji řady. Na Radaru řeší okraj stránka.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (isTv() && event.action == android.view.KeyEvent.ACTION_DOWN &&
+            (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT || event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT)
+        ) {
+            val dir = if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1
+            val f = currentFocus
+            when {
+                f is android.webkit.WebView -> Unit // radar: lišta tlačítek ve stránce
+                f is android.widget.SeekBar -> Unit
+                f != null && f in tabs -> {
+                    val t = current + dir
+                    if (t in 0..2) { show(t); tabs[t].requestFocus() }
+                    return true
+                }
+                else -> {
+                    val next = f?.focusSearch(if (dir > 0) View.FOCUS_RIGHT else View.FOCUS_LEFT)
+                    if (f == null || next == null || !sameRow(f, next)) {
+                        swipe(dir)
+                        return true
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /** Leží dva prvky vedle sebe ve stejném řádku (svislý překryv)? */
+    private fun sameRow(a: View, b: View): Boolean {
+        val ra = IntArray(2).also { a.getLocationOnScreen(it) }
+        val rb = IntArray(2).also { b.getLocationOnScreen(it) }
+        val top = maxOf(ra[1], rb[1])
+        val bottom = minOf(ra[1] + a.height, rb[1] + b.height)
+        return bottom - top > minOf(a.height, b.height) / 2
+    }
+
     /** Přepnutí na vedlejší kartu přejetím prstem (dir +1 = další, −1 = předchozí). */
     fun swipe(dir: Int) {
         val t = current + dir
         if (t !in 0..2) return
         show(t)
+        if (isTv()) container.post { if (!container.requestFocus(View.FOCUS_DOWN)) tabs[t].requestFocus() }
         container.translationX = dir * container.width * 0.3f
         container.alpha = 0.4f
         container.animate().translationX(0f).alpha(1f).setDuration(180).start()

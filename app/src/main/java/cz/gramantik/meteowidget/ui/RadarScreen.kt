@@ -44,6 +44,10 @@ class RadarScreen(private val a: Activity) : MainActivity.Screen {
                 @android.webkit.JavascriptInterface
                 fun leave(dir: String) {
                     web.post {
+                        if (dir == "left" || dir == "right") {
+                            (a as? MainActivity)?.swipe(if (dir == "right") 1 else -1)
+                            return@post
+                        }
                         val next = web.focusSearch(if (dir == "up") View.FOCUS_UP else View.FOCUS_DOWN)
                         next?.requestFocus()
                     }

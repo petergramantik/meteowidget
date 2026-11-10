@@ -89,47 +89,47 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         return f.hours.filter { !it.time.isBefore(now) }
     }
 
-    // ---------- teď (kompaktní) ----------
+    // ---------- teď (kompaktní: 1 řádek na TV, 2 na telefonu) ----------
     private fun now(f: FullForecast) {
         val h = upcoming(f).firstOrNull() ?: return
         val today = f.days.firstOrNull { it.date == LocalDate.now() }
-        val c = a.card("Teď · ${h.time.hour}:00")
-        val top = a.hbox()
-        top.addView(a.animIcon(h.icon, 72))
-        val col = a.vbox()
-        val tempRow = a.hbox(Gravity.BOTTOM)
-        tempRow.addView(a.text(deg(h.temp), 42f, C.WHITE, condensed = true))
-        today?.let {
-            tempRow.addView(a.vbox().apply {
-                addView(a.text("dnes max ${deg(it.tMax)}", 12f, C.IN, condensed = true))
-                addView(a.text("dnes min ${deg(it.tMin)}", 12f, 0xFF8FB3FF.toInt(), condensed = true))
-            }, a.lp(WRAP, WRAP, start = 10))
-        }
-        col.addView(tempRow)
-        col.addView(a.text(ForecastFull.describe(h.code), 15f, C.LABEL), a.lp(top = 2))
-        top.addView(col, a.lp(0, WRAP, 1f, start = 10))
-        c.addView(top)
+        val tv = a.isTv()
+        val c = a.card()
+        c.setPadding(a.dp(12), a.dp(8), a.dp(12), a.dp(8))
 
-        // drobné řádky po třech hodnotách
         fun mini(label: String, value: String, color: Int) = a.vbox().apply {
-            addView(a.text(label, 10f, C.DIM, bold = true).apply { letterSpacing = 0.06f })
-            addView(a.text(value, 14f, color, condensed = true), a.lp(WRAP, WRAP, top = 1))
+            addView(a.text(label, 8.5f, C.DIM, bold = true).apply { letterSpacing = 0.05f; maxLines = 1 })
+            addView(a.text(value, if (tv) 12f else 11.5f, color, condensed = true).apply { maxLines = 2 }, a.lp(WRAP, WRAP))
         }
-        val items = listOf(
-            mini("POCITOVĚ", deg(h.feels), C.FEELS),
+        val head = a.hbox()
+        head.addView(a.animIcon(h.icon, if (tv) 40 else 46))
+        head.addView(a.text(deg(h.temp), if (tv) 28f else 32f, C.WHITE, condensed = true), a.lp(WRAP, WRAP, start = 6))
+        head.addView(a.vbox().apply {
+            addView(a.text("Teď ${h.time.hour}:00 · " + ForecastFull.describe(h.code), 13f, C.WHITE, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+            val mm = today?.let { "max ${deg(it.tMax)} · min ${deg(it.tMin)}" } ?: ""
+            addView(a.text(if (tv) mm else (if (mm.isEmpty()) "" else "$mm · ") + "pocitově ${deg(h.feels)}", 11f, C.LABEL, condensed = true).apply { maxLines = 1 })
+        }, a.lp(if (tv) WRAP else 0, WRAP, if (tv) 0f else 1f, start = 8))
+
+        val items = listOfNotNull(
+            if (tv) mini("POCITOVĚ", deg(h.feels), C.FEELS) else null,
             mini("SRÁŽKY", "${f1(h.precip)} mm" + if (h.prob >= 0) " · ${h.prob} %" else "", C.RAIN),
             mini("VÍTR", "${h.wind.roundToInt()} (${h.gust.roundToInt()}) km/h ${ForecastFull.windDir(h.dir)}", C.WIND),
             mini("VLHKOST", "${h.hum.roundToInt()} % · rb ${deg(h.dew)}", C.OUT),
             mini("TLAK", "${h.pressure.roundToInt()} hPa", C.BARO),
             mini("OBLAČNOST", "${h.cloud.roundToInt()} % · ${(h.visibility / 1000).roundToInt()} km", C.LABEL),
         )
-        items.chunked(3).forEach { rowItems ->
+        if (tv) {
+            // vše na jednom řádku
+            items.forEach { head.addView(it, a.lp(0, WRAP, 1f, start = 10)) }
+            c.addView(head)
+        } else {
+            c.addView(head)
             val r = a.hbox(Gravity.TOP)
-            rowItems.forEach { r.addView(it, a.lp(0, WRAP, 1f)) }
-            c.addView(r, a.lp(top = 8))
+            items.forEach { r.addView(it, a.lp(0, WRAP, 1f, end = 4)) }
+            c.addView(r, a.lp(top = 6))
         }
         val storm = upcoming(f).take(12).maxOfOrNull { it.storm } ?: 0
-        if (storm > 0) c.addView(a.text(ForecastFull.stormText(storm) + " v příštích 12 h", 13f, C.ACCENT, bold = true), a.lp(top = 8))
+        if (storm > 0) c.addView(a.text(ForecastFull.stormText(storm) + " v příštích 12 h", 12f, C.ACCENT, bold = true), a.lp(top = 4))
         content.addView(SwipeFrame(a) { (a as? MainActivity)?.swipe(it) }.apply { addView(c) }, a.lp(bottom = 4))
     }
 

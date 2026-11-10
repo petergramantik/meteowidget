@@ -355,7 +355,14 @@
       document.addEventListener('keydown', function (e) {
         var k = e.key;
         if (k === 'ArrowLeft' || k === 'ArrowRight') {
-          tvSel = (tvSel + (k === 'ArrowRight' ? 1 : -1) + tvButtons.length) % tvButtons.length;
+          var d = k === 'ArrowRight' ? 1 : -1;
+          // na okraji lišty přepnout kartu aplikace
+          if ((d < 0 && tvSel === 0) || (d > 0 && tvSel === tvButtons.length - 1)) {
+            tvFocused = false; drawTv();
+            if (window.TvBridge) TvBridge.leave(d > 0 ? 'right' : 'left');
+            e.preventDefault(); e.stopPropagation(); return;
+          }
+          tvSel += d;
           tvFocused = true; drawTv();
         } else if (k === 'Enter' || k === ' ') {
           tvFocused = true; tvButtons[tvSel].a(); drawTv();

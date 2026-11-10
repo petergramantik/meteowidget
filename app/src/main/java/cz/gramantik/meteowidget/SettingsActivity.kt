@@ -193,6 +193,19 @@ class SettingsActivity : Activity() {
         }
         showNext()
         bindNum(R.id.tv_autoclose, TvSchedule.autoCloseMin(this).toFloat()) { TvSchedule.setAutoCloseMin(this, it.toInt()) }
+        val sleepCb = findViewById<CheckBox>(R.id.tv_sleep)
+        sleepCb.isChecked = SleepAdmin.enabled(this)
+        sleepCb.setOnCheckedChangeListener { _, on ->
+            SleepAdmin.setEnabled(this, on)
+            if (on && !SleepAdmin.isActive(this)) SleepAdmin.request(this)
+            showSleepStatus()
+        }
+        findViewById<Button>(R.id.tv_sleep_btn).setOnClickListener {
+            if (!SleepAdmin.request(this)) android.widget.Toast.makeText(this,
+                "Tento box neumí zobrazit povolení Správy zařízení. Zkus Nastavení boxu → Zabezpečení → Správci zařízení.",
+                android.widget.Toast.LENGTH_LONG).show()
+        }
+        showSleepStatus()
         findViewById<Button>(R.id.tv_autoclose_test).setOnClickListener {
             numFields.forEach { (e, set) -> e.text.toString().replace(',', '.').toFloatOrNull()?.let(set) }
             TvSchedule.testAutoClose(this)
@@ -355,6 +368,17 @@ class SettingsActivity : Activity() {
         walk(window.decorView)
     }
 
+
+    private fun showSleepStatus() {
+        val st = findViewById<TextView>(R.id.tv_sleep_status) ?: return
+        val active = SleepAdmin.isActive(this)
+        st.text = when {
+            active && SleepAdmin.enabled(this) -> "✅ Box se po automatickém zavření uspí"
+            active -> "Povoleno – zapni přepínač výše"
+            else -> "⚠ Uspání zatím není povolené – klikni na „Povolit uspání boxu“"
+        }
+        findViewById<View>(R.id.tv_sleep_btn)?.visibility = if (active) View.GONE else View.VISIBLE
+    }
 
     // ---------- rozcestník podsekcí ----------
     private data class Sec(val id: Int, val title: String, val status: () -> String)
@@ -755,5 +779,6 @@ class SettingsActivity : Activity() {
                 "Klepni níže a povol běh bez omezení. Na Samsungu zkontroluj i Péče o baterii → Uspané aplikace."
         if (::updateButton.isInitialized) refreshUpdateUi()
         if (openSection == null && menuStatus.isNotEmpty()) refreshMenu()
+        showSleepStatus()
     }
 }

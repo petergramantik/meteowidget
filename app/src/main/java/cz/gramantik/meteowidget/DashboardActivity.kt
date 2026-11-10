@@ -86,7 +86,9 @@ class DashboardActivity : Activity() {
             if (left <= 0) {
                 panel.setCountdown(null)
                 autoCloseAt = 0L
-                finish() // box pak usne podle svého nastavení (a přes HDMI-CEC zhasne TV)
+                // uspat box (zhasnutí obrazovky) – jinak by se ukázalo hlavní rozhraní boxu
+                if (SleepAdmin.enabled(this@DashboardActivity)) SleepAdmin.sleepNow(this@DashboardActivity)
+                finish() // jinak box usne podle svého nastavení (a přes HDMI-CEC zhasne TV)
                 return
             }
             val s = (left / 1000).toInt()

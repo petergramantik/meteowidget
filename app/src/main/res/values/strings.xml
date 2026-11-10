@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="a11y_sleep_label">Meteostanice – uspání</string>
+    <string name="a11y_sleep_desc">Umožní Meteostanici po automatickém zavření panelu zamknout obrazovku, aby box usnul a přes HDMI-CEC vypnul i televizi. Služba nečte obsah obrazovky ani nesleduje, co děláš.</string>
     <string name="app_name">Meteostanice</string>
     <string name="widget_name">Meteostanice Sencor</string>
     <string name="widget_desc">Data ze stanice Sencor SWS 16600 a předpověď na 10 dní. Roztáhni ho pro víc údajů.</string>

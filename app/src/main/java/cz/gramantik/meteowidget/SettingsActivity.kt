@@ -197,9 +197,12 @@ class SettingsActivity : Activity() {
         sleepCb.isChecked = SleepAdmin.enabled(this)
         sleepCb.setOnCheckedChangeListener { _, on ->
             SleepAdmin.setEnabled(this, on)
-            if (on && !SleepAdmin.isActive(this)) SleepAdmin.request(this)
+            if (on && !SleepAdmin.isActive(this)) {
+                if (android.os.Build.VERSION.SDK_INT >= 28) openSleepA11y() else SleepAdmin.request(this)
+            }
             showSleepStatus()
         }
+        findViewById<Button>(R.id.tv_sleep_a11y_btn).setOnClickListener { openSleepA11y() }
         findViewById<Button>(R.id.tv_sleep_btn).setOnClickListener {
             if (!SleepAdmin.request(this)) android.widget.Toast.makeText(this,
                 "Tento box neumí zobrazit povolení Správy zařízení. Zkus Nastavení boxu → Zabezpečení → Správci zařízení.",
@@ -369,15 +372,26 @@ class SettingsActivity : Activity() {
     }
 
 
+    private fun openSleepA11y() {
+        if (SleepAdmin.openA11ySettings(this)) android.widget.Toast.makeText(this,
+            "V Usnadnění vyber „Meteostanice – uspání“ a zapni ji.", android.widget.Toast.LENGTH_LONG).show()
+        else android.widget.Toast.makeText(this, "Nastavení Usnadnění se nepodařilo otevřít.", android.widget.Toast.LENGTH_LONG).show()
+    }
+
     private fun showSleepStatus() {
         val st = findViewById<TextView>(R.id.tv_sleep_status) ?: return
-        val active = SleepAdmin.isActive(this)
+        val a11y = SleepAdmin.a11yActive(this)
+        val admin = SleepAdmin.adminActive(this)
+        val how = if (a11y) "přes Usnadnění" else "přes Správu zařízení"
         st.text = when {
-            active && SleepAdmin.enabled(this) -> "✅ Box se po automatickém zavření uspí"
-            active -> "Povoleno – zapni přepínač výše"
-            else -> "⚠ Uspání zatím není povolené – klikni na „Povolit uspání boxu“"
+            (a11y || admin) && SleepAdmin.enabled(this) -> "✅ Box se po automatickém zavření uspí ($how)"
+            a11y || admin -> "Povoleno $how – zapni přepínač výše"
+            android.os.Build.VERSION.SDK_INT >= 28 -> "⚠ Uspání zatím není povolené – klikni na „Povolit uspání přes Usnadnění“"
+            else -> "⚠ Uspání zatím není povolené – klikni na „Povolit přes Správu zařízení“"
         }
-        findViewById<View>(R.id.tv_sleep_btn)?.visibility = if (active) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.tv_sleep_a11y_btn)?.visibility =
+            if (a11y || android.os.Build.VERSION.SDK_INT < 28) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.tv_sleep_btn)?.visibility = if (a11y || admin) View.GONE else View.VISIBLE
     }
 
     // ---------- rozcestník podsekcí ----------

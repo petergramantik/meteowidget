@@ -147,7 +147,12 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
     private fun toggleChannel(ch: Channel) {
         openChannel = if (openChannel == ch) null else ch
         refresh()
+        // TV: výběr zůstane na čidle
+        if (a.isTv()) tvItems[ch]?.let { v -> v.post { v.requestFocus() } }
     }
+
+    /** TV: prvky čidel v řádku (pro návrat focusu po překreslení) */
+    private val tvItems = HashMap<Channel, View>()
 
     /** TV: Doma, Venku a čidla v jednom řádku. */
     private fun currentTv(p: Prefs, w: Weather) {
@@ -167,7 +172,12 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
                 isClickable = true
                 isFocusable = true
                 setOnClickListener { toggleChannel(ch) }
+                // je otevřený graf jiného čidla -> přechodem šipkou rozbalit toto čidlo
+                setOnFocusChangeListener { v, has ->
+                    if (has && openChannel != null && openChannel != ch) v.post { toggleChannel(ch) }
+                }
                 tvFocus(if (openChannel == ch) 0x88FFD54F.toInt() else C.LINE, 1.0f)
+                tvItems[ch] = this
             }, a.lp(WRAP, WRAP))
         }
         big.addView(HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(row) })

@@ -189,8 +189,8 @@
         layerFor(frames[(idx + 1) % frames.length]); // přednačíst další
       }
       var d = new Date(frames[idx].time * 1000);
-      timeEl.textContent = d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) +
-        (idx === frames.length - 1 ? ' (teď)' : '');
+      timeEl.innerHTML = d.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) +
+        (idx === frames.length - 1 ? ' <span style="color:#ffd54f;font-weight:bold">(teď)</span>' : '');
       slider.value = idx;
     }
     function stop() { if (timer) { clearTimeout(timer); timer = null; } playBtn.textContent = '▶'; if (window.drawTv) drawTv(); }

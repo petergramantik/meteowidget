@@ -97,7 +97,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             addView(c.label("MIN"), c.lp(WRAP, WRAP))
             addView(c.text(deg(d.tMin), 30f, 0xFF8FB3FF.toInt(), condensed = true), c.lp(WRAP, WRAP, top = 2))
         }, c.lp(0, WRAP, 1f))
-        left.addView(head, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, c.dp(HEAD_H)))
+        // bez vlhkostí stačí nižší hlavička – víc místa pro ráno/odpoledne/večer
+        left.addView(head, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, c.dp(HEAD_H - 18)))
         val mid = c.vbox()
         // zmenšené dlaždice 3 × 2
         val tf = java.time.format.DateTimeFormatter.ofPattern("H:mm")
@@ -137,7 +138,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                 pr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
                     addView(c.label("$name ${h.time.hour}:00").apply { textSize = 6.5f }, c.lp(WRAP, WRAP))
                     addView(c.hbox(Gravity.CENTER_VERTICAL).apply {
-                        addView(c.icon(h.icon, 18), c.lp(c.dp(18), c.dp(18)))
+                        addView(c.icon(h.icon, 16), c.lp(c.dp(16), c.dp(16)))
                         addView(c.text(deg(h.temp), 12f, C.WHITE, condensed = true), c.lp(WRAP, WRAP, start = 3))
                         if (h.precip >= 0.1) addView(c.text(" ${f1(h.precip)} mm", 7f, C.RAIN), c.lp(WRAP, WRAP))
                     }, c.lp(WRAP, WRAP))
@@ -228,13 +229,27 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         } else {
         val lr = c.hbox(Gravity.TOP)
         val hasSensors = w != null && listOf(Channel.S1, Channel.S2, Channel.S3).any { w.temp(it.tempCode) != null }
-        fun col(name: String, temp: Double?, hum: Int?, color: Int, end: Boolean) = c.vbox(if (end) Gravity.END else Gravity.START).apply {
+        val np = NotifyPrefs(c)
+        fun pulse(v: View) = android.animation.ObjectAnimator.ofFloat(v, View.ALPHA, 1f, 0.45f).apply {
+            duration = 1400
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            repeatMode = android.animation.ValueAnimator.REVERSE
+            start()
+        }
+        fun col(name: String, temp: Double?, hum: Int?, color: Int, end: Boolean, comfort: Boolean = false) = c.vbox(if (end) Gravity.END else Gravity.START).apply {
             addView(c.label(name), c.lp(WRAP, WRAP))
-            addView(c.text(t(temp), 30f, color, condensed = true), c.lp(WRAP, WRAP, top = 2))
-            addView(c.text(Weather.h(hum), 14f, color, condensed = true), c.lp(WRAP, WRAP))
+            val tv = c.text(t(temp), 30f, color, condensed = true)
+            addView(tv, c.lp(WRAP, WRAP, top = 2))
+            val hv = c.text(Weather.h(hum), 14f, color, condensed = true)
+            addView(hv, c.lp(WRAP, WRAP))
+            // Doma mimo komfortní zónu -> slabě pulzovat
+            if (comfort) {
+                if (temp != null && (temp < np.tempMin || temp > np.tempMax)) pulse(tv)
+                if (hum != null && (hum < np.humMin || hum > np.humMax)) pulse(hv)
+            }
         }
         val todayF = f?.days?.firstOrNull { it.date == today }
-        lr.addView(col(p.channelName(Channel.IN), w?.tempIn, w?.humIn, C.IN, false), c.lp(0, WRAP, 1f))
+        lr.addView(col(p.channelName(Channel.IN), w?.tempIn, w?.humIn, C.IN, false, comfort = true), c.lp(0, WRAP, 1f))
         // uprostřed dnešní předpověď (jako na kartě Zítra)
         if (todayF != null) lr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
             addView(c.icon(todayF.icon, 30), c.lp(c.dp(30), c.dp(30), top = 2))

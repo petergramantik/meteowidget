@@ -13,6 +13,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import cz.gramantik.meteowidget.ui.AlertsScreen
 import cz.gramantik.meteowidget.ui.C
 import cz.gramantik.meteowidget.ui.ForecastScreen
 import cz.gramantik.meteowidget.ui.RadarScreen
@@ -37,7 +38,8 @@ class MainActivity : Activity() {
 
     private lateinit var container: FrameLayout
     private val tabs = ArrayList<ImageView>()
-    private var screens = arrayOfNulls<Screen>(3)
+    private var screens = arrayOfNulls<Screen>(4) // 3 = Upozornění (mimo dolní menu)
+    private lateinit var badge: TextView
     private var current = 0
     private lateinit var title: TextView
     private lateinit var refreshBtn: ImageView
@@ -62,6 +64,19 @@ class MainActivity : Activity() {
         val bar = hbox().apply { setPadding(dp(16), dp(10), dp(8), dp(6)) }
         title = text("Meteostanice", 20f, C.WHITE, bold = true)
         bar.addView(title, lp(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        // zvoneček s počtem nepřečtených upozornění
+        val bell = FrameLayout(this).apply {
+            addView(barButton(R.drawable.ic_bell) { openTab(if (current == 3) 0 else 3) })
+            badge = text("", 10f, C.BG, bold = true).apply {
+                gravity = Gravity.CENTER
+                background = rounded(0xFFFF5252.toInt(), dp(8).toFloat())
+                setPadding(dp(4), 0, dp(4), 0)
+                minWidth = dp(16)
+                visibility = View.GONE
+            }
+            addView(badge, FrameLayout.LayoutParams(-2, dp(16), Gravity.TOP or Gravity.END).apply { topMargin = dp(4); marginEnd = dp(4) })
+        }
+        bar.addView(bell)
         refreshBtn = barButton(R.drawable.ic_refresh) { refreshData() }
         bar.addView(refreshBtn)
         if (isTv()) bar.addView(barButton(R.drawable.ic_tv) { backToTvPanel() })
@@ -144,18 +159,39 @@ class MainActivity : Activity() {
 
     private fun show(i: Int) {
         current = i
+        val tabIdx = if (i == 3) 0 else i // Upozornění patří ke Stanici
         tabs.forEachIndexed { j, t ->
-            t.setColorFilter(if (j == i) C.BG else C.DIM)
-            t.background = if (j == i) rounded(C.ACCENT, dp(18).toFloat()) else null
+            t.setColorFilter(if (j == tabIdx) C.BG else C.DIM)
+            t.background = if (j == tabIdx) rounded(C.ACCENT, dp(18).toFloat()) else null
         }
         val s = screens[i] ?: when (i) {
             0 -> StationScreen(this)
             1 -> ForecastScreen(this)
-            else -> RadarScreen(this)
+            2 -> RadarScreen(this)
+            else -> AlertsScreen(this)
         }.also { screens[i] = it }
         container.removeAllViews()
         container.addView(s.view)
-        title.text = listOf("Stanice", "Předpověď", "Radar")[i]
+        title.text = listOf("Stanice", "Předpověď", "Radar", "Upozornění")[i]
+        if (i == 3) {
+            s.refresh()
+            NotifyLog.markAllRead(this)
+        }
+        updateBadge()
+    }
+
+    /** Otevře kartu (0–2) nebo stránku Upozornění (3). */
+    fun openTab(i: Int) {
+        show(i)
+        container.alpha = 0.4f
+        container.animate().alpha(1f).setDuration(150).start()
+    }
+
+    private fun updateBadge() {
+        if (!::badge.isInitialized) return
+        val n = NotifyLog.unread(this)
+        badge.text = if (n > 99) "99+" else n.toString()
+        badge.visibility = if (n > 0) View.VISIBLE else View.GONE
     }
 
     /**
@@ -172,7 +208,7 @@ class MainActivity : Activity() {
                 f is android.webkit.WebView -> Unit // radar: lišta tlačítek ve stránce
                 f is android.widget.SeekBar -> Unit
                 f != null && f in tabs -> {
-                    val t = current + dir
+                    val t = (if (current == 3) 0 else current) + dir
                     if (t in 0..2) { show(t); tabs[t].requestFocus() }
                     return true
                 }
@@ -199,10 +235,15 @@ class MainActivity : Activity() {
 
     /** Přepnutí na vedlejší kartu přejetím prstem (dir +1 = další, −1 = předchozí). */
     fun swipe(dir: Int) {
-        val t = current + dir
-        if (t !in 0..2) return
+        // Upozornění leží „před“ Stanicí: Stanice + přejetí doprava (dir −1) -> Upozornění
+        val t = when {
+            current == 3 -> if (dir > 0) 0 else return
+            current == 0 && dir < 0 -> 3
+            else -> current + dir
+        }
+        if (t !in 0..3) return
         show(t)
-        if (isTv()) container.post { if (!container.requestFocus(View.FOCUS_DOWN)) tabs[t].requestFocus() }
+        if (isTv()) container.post { if (!container.requestFocus(View.FOCUS_DOWN)) tabs[if (t == 3) 0 else t].requestFocus() }
         container.translationX = dir * container.width * 0.3f
         container.alpha = 0.4f
         container.animate().translationX(0f).alpha(1f).setDuration(180).start()
@@ -218,6 +259,8 @@ class MainActivity : Activity() {
                 refreshBtn.isEnabled = true
                 refreshBtn.alpha = 1f
                 screens.forEach { it?.refresh() }
+                if (current == 3) NotifyLog.markAllRead(this)
+                updateBadge()
             }
         }.start()
     }
@@ -235,6 +278,8 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         screens.forEach { it?.refresh() }
+        if (current == 3) NotifyLog.markAllRead(this)
+        updateBadge()
         try {
             getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(netCallback)
         } catch (e: Exception) {
@@ -259,7 +304,8 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (isTv()) backToTvPanel()
+        if (current == 3) openTab(0)
+        else if (isTv()) backToTvPanel()
         else {
             @Suppress("DEPRECATION")
             super.onBackPressed()

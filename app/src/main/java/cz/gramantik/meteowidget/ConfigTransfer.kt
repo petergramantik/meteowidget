@@ -44,7 +44,7 @@ object ConfigTransfer {
         "gapTried", "updCheck", "updVersion", "updUrl", "alerts", "alertsTime", "seenAlerts",
         "batteryAsk", "icsEvents", "icsTime", "icsError", "stTuya", "stMapy", "stOwm", "stGoogle", "stIcs",
     )
-    private val SKIP_PREFIX = listOf("nLast_", "mini_")
+    private val SKIP_PREFIX = listOf("nLast_", "mini_", "nLog")
 
     private fun export(ctx: Context): String {
         val sp = ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE)

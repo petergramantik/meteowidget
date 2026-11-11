@@ -66,6 +66,7 @@ object Notify {
             ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
     fun post(ctx: Context, id: Int, title: String, text: String) {
+        NotifyLog.add(ctx, id, title, text)
         if (!canPost(ctx)) return
         ensureChannel(ctx)
         val open = PendingIntent.getActivity(
@@ -154,4 +155,51 @@ object Notify {
         // držet jen posledních 50
         sp(ctx).edit().putStringSet("seenAlerts", seen.toList().takeLast(50).toSet()).apply()
     }
+}
+
+
+/** Historie upozornění (7 dní) pro stránku Upozornění v aplikaci. */
+object NotifyLog {
+    data class Item(val t: Long, val id: Int, val title: String, val text: String, val read: Boolean)
+
+    private const val KEY = "nLog"
+    private const val KEEP = 7 * 24 * 3600_000L
+    private fun sp(ctx: Context) = ctx.getSharedPreferences("meteo", Context.MODE_PRIVATE)
+
+    @Synchronized
+    fun load(ctx: Context): List<Item> {
+        val arr = try { org.json.JSONArray(sp(ctx).getString(KEY, "[]")) } catch (e: Exception) { org.json.JSONArray() }
+        val min = System.currentTimeMillis() - KEEP
+        return (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            Item(o.optLong("t"), o.optInt("id"), o.optString("title"), o.optString("text"), o.optBoolean("read"))
+        }.filter { it.t >= min }.sortedByDescending { it.t }
+    }
+
+    @Synchronized
+    private fun save(ctx: Context, items: List<Item>) {
+        val arr = org.json.JSONArray()
+        items.take(200).forEach {
+            arr.put(org.json.JSONObject().put("t", it.t).put("id", it.id).put("title", it.title).put("text", it.text).put("read", it.read))
+        }
+        sp(ctx).edit().putString(KEY, arr.toString()).apply()
+    }
+
+    @Synchronized
+    fun add(ctx: Context, id: Int, title: String, text: String) =
+        save(ctx, listOf(Item(System.currentTimeMillis(), id, title, text, false)) + load(ctx))
+
+    fun unread(ctx: Context) = load(ctx).count { !it.read }
+
+    /** Označí vše jako přečtené a smaže upozornění z lišty (vynuluje počet na ikoně). */
+    @Synchronized
+    fun markAllRead(ctx: Context) {
+        save(ctx, load(ctx).map { it.copy(read = true) })
+        try {
+            (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).cancelAll()
+        } catch (e: Exception) {
+        }
+    }
+
+    fun clear(ctx: Context) = sp(ctx).edit().remove(KEY).apply()
 }

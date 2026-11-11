@@ -127,9 +127,9 @@ object TvMorning {
     private fun deg(v: Double) = "${v.roundToInt()}°"
     private fun n1(v: Double) = String.format(cz, "%.1f", v)
 
-    /** Den, ke kterému se vztahuje kalendář a upozornění (po 18:00 zítřek). */
+    /** Den, ke kterému se vztahuje kalendář a upozornění (od 20:00 zítřek). */
     fun targetDay(now: LocalDateTime = LocalDateTime.now()): LocalDate =
-        if (now.hour >= 18) now.toLocalDate().plusDays(1) else now.toLocalDate()
+        if (now.hour >= 20) now.toLocalDate().plusDays(1) else now.toLocalDate()
 
     data class Result(val warns: List<MorningWarn>, val icons: List<Int>, val pulse: Set<Int> = emptySet())
 
@@ -260,12 +260,25 @@ object TvMorning {
         val list = c.vbox()
         val evs = CalendarIcs.events(c, day)
         if (CalendarIcs.url(c).isEmpty()) list.addView(c.text("Kalendář není nastavený", 10f, C.DIM))
-        else if (evs.isEmpty()) list.addView(c.text(if (tomorrow) "Zítra nic v kalendáři 🎉" else "Dnes nic v kalendáři 🎉", 11f, C.WHITE))
-        else evs.forEach { e ->
-            val r = c.hbox(Gravity.TOP)
-            r.addView(c.text(e.time.ifEmpty { "celý den" }, 10.5f, C.ACCENT, bold = true, condensed = true), c.lp(c.dp(44), WRAP))
-            r.addView(c.text(e.summary, 10.5f, C.WHITE).apply { maxLines = 2 }, c.lp(0, WRAP, 1f))
-            list.addView(r, c.lp(bottom = 4))
+        else {
+            fun addEvents(list2: List<CalEvent>) = list2.forEach { e ->
+                val r = c.hbox(Gravity.TOP)
+                r.addView(c.text(e.time.ifEmpty { "celý den" }, 10.5f, C.ACCENT, bold = true, condensed = true), c.lp(c.dp(44), WRAP))
+                r.addView(c.text(e.summary, 10.5f, C.WHITE).apply { maxLines = 2 }, c.lp(0, WRAP, 1f))
+                list.addView(r, c.lp(bottom = 4))
+            }
+            if (evs.isNotEmpty()) addEvents(evs)
+            else {
+                list.addView(c.text(if (tomorrow) "Zítra nic v kalendáři 🎉" else "Dnes nic v kalendáři 🎉", 11f, C.WHITE), c.lp(bottom = 4))
+                // dnes prázdno -> ukázat zítřek
+                if (!tomorrow) {
+                    val tmr = CalendarIcs.events(c, day.plusDays(1))
+                    if (tmr.isNotEmpty()) {
+                        list.addView(c.label("Zítra:", C.BARO).apply { textSize = 8.5f }, c.lp(top = 2, bottom = 2))
+                        addEvents(tmr)
+                    }
+                }
+            }
         }
         cal.addView(AutoScroll(c).apply { addView(list) }, c.lp(h = 0, weight = 1f, top = 3))
         cols.addView(cal, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = 10))

@@ -435,6 +435,14 @@ class SettingsActivity : Activity() {
         )
     }
     private val menuRows = ArrayList<View>()
+    private var updateBanner: android.widget.LinearLayout? = null
+
+    private fun refreshUpdateBanner() {
+        val b = updateBanner ?: return
+        val avail = try { Updater.updateAvailable(this) } catch (e: Exception) { false }
+        b.visibility = if (avail) View.VISIBLE else View.GONE
+        if (avail) b.findViewWithTag<TextView>("txt")?.text = "⬆ Nová verze 1.${prefs.availableVersion} je k dispozici"
+    }
     private val menuStatus = ArrayList<TextView>()
     private var openSection: Int? = null
 
@@ -463,6 +471,31 @@ class SettingsActivity : Activity() {
             setPadding(0, 0, 0, (8 * resources.displayMetrics.density).toInt())
         })
         val d = resources.displayMetrics.density
+        // nová verze – hned nahoře
+        updateBanner = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding((14 * d).toInt(), (12 * d).toInt(), (14 * d).toInt(), (12 * d).toInt())
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFFFFD54F.toInt()); cornerRadius = 12 * d; setStroke((1 * d).toInt(), 0xFFFFD54F.toInt())
+            }
+            isClickable = true
+            isFocusable = true
+            addView(TextView(this@SettingsActivity).apply {
+                textSize = 16f; setTextColor(0xFF060709.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD)
+                tag = "txt"
+            }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+            addView(TextView(this@SettingsActivity).apply {
+                text = "Aktualizovat ›"; textSize = 15f; setTextColor(0xFF060709.toInt()); setTypeface(typeface, android.graphics.Typeface.BOLD)
+            })
+            setOnClickListener {
+                showSection(R.id.sec_app)
+                updateButton.post { updateButton.performClick() }
+            }
+            tvFocus(restoreStroke = 0xFFFFD54F.toInt(), scale = 1.0f, light = true)
+        }
+        box.addView(updateBanner, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = (10 * d).toInt() })
+        refreshUpdateBanner()
         sections.forEach { sec ->
             val st = TextView(this).apply { textSize = 13f; setTextColor(0xFF8A8A8A.toInt()) }
             val row = android.widget.LinearLayout(this).apply {
@@ -589,7 +622,7 @@ class SettingsActivity : Activity() {
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
         setupTvFocus()
-        if (isTv()) menuRows.firstOrNull()?.requestFocus()
+        if (isTv()) (updateBanner?.takeIf { it.visibility == View.VISIBLE } ?: menuRows.firstOrNull())?.requestFocus()
     }
 
     override fun onDestroy() {
@@ -794,6 +827,7 @@ class SettingsActivity : Activity() {
                 "Klepni níže a povol běh bez omezení. Na Samsungu zkontroluj i Péče o baterii → Uspané aplikace."
         if (::updateButton.isInitialized) refreshUpdateUi()
         if (openSection == null && menuStatus.isNotEmpty()) refreshMenu()
+        refreshUpdateBanner()
         showSleepStatus()
     }
 }

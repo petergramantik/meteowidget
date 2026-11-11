@@ -50,6 +50,10 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
     var tomorrow = false
     /** právě zobrazená karta (zvýrazní se i bez focusu) */
     var activeTab = 0
+    private val tabStylers = ArrayList<(Boolean) -> Unit>()
+
+    /** Přebarví záložky podle aktivní karty (bez překreslení celého panelu). */
+    fun restyleTabs() = tabViews.forEachIndexed { i, t -> tabStylers.getOrNull(i)?.invoke(t.isFocused) }
     /** animovaná ikona „teď“ se drží mezi překresleními (aby se animace nerestartovala) */
     private var animKey: String? = null
     private var animView: View? = null
@@ -107,6 +111,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         // ---------- záložky + čas ----------
         val top = c.hbox()
         tabViews.clear()
+        tabStylers.clear()
         if (interactive) {
             val unread = NotifyLog.unread(c)
             TABS.forEachIndexed { i, name0 ->
@@ -125,6 +130,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                             if (has || active) C.ACCENT else C.LINE)
                     }
                     style(false)
+                    tabStylers.add { has -> style(has) }
                     setOnFocusChangeListener { _, has -> style(has) }
                 }
                 tabViews.add(tv)

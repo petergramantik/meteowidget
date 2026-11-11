@@ -167,6 +167,8 @@ class DashboardActivity : Activity() {
         if (i == TvHome.TAB_SETTINGS) return
         panel.home.activeTab = i
         if (!isCard(i)) {
+            // skrýt kartu – focus nesmí zůstat v ní
+            if (cardHost.hasFocus()) panel.home.tabViews.getOrNull(i)?.requestFocus()
             cardHost.visibility = View.GONE
             val wantTomorrow = i == TvHome.TAB_TOMORROW
             panel.home.tomorrow = wantTomorrow
@@ -189,7 +191,7 @@ class DashboardActivity : Activity() {
             }
             placeCardHost()
             cardHost.visibility = View.VISIBLE
-            panel.render() // zvýraznění aktivní záložky
+            panel.home.restyleTabs() // zvýraznění aktivní záložky (bez překreslení – focus zůstane v menu)
         }
         pendingCard = r
         cardHandler.postDelayed(r, 250)
@@ -340,8 +342,21 @@ class DashboardActivity : Activity() {
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (tabs.isEmpty()) return true
                 val cur = tabs.indexOfFirst { it.isFocused }.let { if (it < 0) panel.focusedTab else it }
+                val right = event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                // jako na mobilu: z Dnes šipkou vlevo na Upozornění, z Upozornění vpravo zpět na Dnes
+                val target = when {
+                    cur == TvHome.TAB_TODAY && !right -> TvHome.TAB_ALERTS
+                    cur == TvHome.TAB_ALERTS && right -> TvHome.TAB_TODAY
+                    else -> null
+                }
+                if (target != null) {
+                    panel.focusedTab = target
+                    tabs.getOrNull(target)?.requestFocus()
+                    showCard(target)
+                    return true
+                }
                 panel.focusedTab = cur
-                moveTab(if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1)
+                moveTab(if (right) 1 else -1)
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,

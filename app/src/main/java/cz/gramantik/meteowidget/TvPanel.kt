@@ -191,6 +191,8 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
     }
 
     fun render() {
+        // byl výběr v menu? (při výměně tlačítek ho Android jinak přesune do obsahu karty)
+        val hadTabFocus = home.tabViews.any { it.isFocused }
         val animated = tv.animatedIcons && !tv.isNight()
         val view = home.build(animated)
         content.removeAllViews()
@@ -201,7 +203,7 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
                 android.view.View.OnFocusChangeListener { v, has -> old?.onFocusChange(v, has); if (has) focusedTab = i }
             })
         }
-        if (!contentHasFocus()) home.tabViews.getOrNull(focusedTab)?.requestFocus()
+        if (hadTabFocus || !contentHasFocus()) home.tabViews.getOrNull(focusedTab)?.requestFocus()
         // posun obsahu o pár dp každých 10 minut
         val now = System.currentTimeMillis()
         if (now - lastShift > 10 * 60_000) {

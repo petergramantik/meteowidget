@@ -44,6 +44,13 @@ class MorningPrefs(ctx: Context) {
     var rainPct: Float
         get() = sp.getFloat("tmRainPct", 50f)
         set(v) = sp.edit().putFloat("tmRainPct", v).apply()
+    /** výrazná změna teploty proti předchozímu dni (10denní předpověď pulzuje) */
+    var warmDelta: Float
+        get() = sp.getFloat("tmWarm", 5f)
+        set(v) = sp.edit().putFloat("tmWarm", v).apply()
+    var coolDelta: Float
+        get() = sp.getFloat("tmCool", 4f)
+        set(v) = sp.edit().putFloat("tmCool", v).apply()
 
     /** Pozdrav podle denní doby. */
     fun greeting(now: LocalTime = LocalTime.now()): Pair<String, String> {

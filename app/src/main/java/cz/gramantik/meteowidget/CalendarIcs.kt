@@ -14,7 +14,10 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 /** Jedna událost v daný den. time = "HH:mm" nebo "" u celodenních. */
-data class CalEvent(val date: LocalDate, val time: String, val summary: String)
+data class CalEvent(val date: LocalDate, val time: String, val summary: String, val src: Int = 0)
+
+/** Zdroj kalendáře (0 = hlavní, 1–3 další). */
+data class CalSrc(val idx: Int, val name: String, val url: String, val color: Int)
 
 /**
  * Kalendář ze soukromé iCal adresy (např. Google „Tajná adresa ve formátu iCal“).
@@ -26,15 +29,58 @@ object CalendarIcs {
 
     fun url(ctx: Context): String = sp(ctx).getString("icsUrl", "") ?: ""
     fun setUrl(ctx: Context, v: String) = sp(ctx).edit().putString("icsUrl", v.trim()).apply()
+    /** je stažený obsah pro kartu Kalendář? */
+    fun hasCache(ctx: Context) = cacheFile(ctx, 0).exists()
+
     fun fetchedAt(ctx: Context): Long = sp(ctx).getLong("icsTime", 0)
     fun error(ctx: Context): String? = sp(ctx).getString("icsError", null)
+
+    // ---------- více kalendářů ----------
+    val COLORS = intArrayOf(0xFFFFD54F.toInt(), 0xFF4FC3F7.toInt(), 0xFF81C784.toInt(), 0xFFF48FB1.toInt())
+    private fun urlKey(i: Int) = if (i == 0) "icsUrl" else "icsUrl${i + 1}"
+
+    fun sources(ctx: Context): List<CalSrc> = (0..3).map { i ->
+        CalSrc(i, sp(ctx).getString("icsName$i", null)?.takeIf { it.isNotBlank() } ?: if (i == 0) "Můj kalendář" else "Kalendář ${i + 1}",
+            sp(ctx).getString(urlKey(i), "") ?: "", COLORS[i])
+    }.filter { it.url.isNotBlank() }
+
+    fun setSource(ctx: Context, i: Int, name: String, url: String) =
+        sp(ctx).edit().putString("icsName$i", name.trim()).putString(urlKey(i), url.trim()).apply()
+    fun name(ctx: Context, i: Int) = sp(ctx).getString("icsName$i", "") ?: ""
+    fun urlOf(ctx: Context, i: Int) = sp(ctx).getString(urlKey(i), "") ?: ""
+
+    /** zobrazit kalendář v kartě Kalendář */
+    fun shown(ctx: Context, i: Int) = sp(ctx).getBoolean("icsShow$i", true)
+    fun setShown(ctx: Context, i: Int, v: Boolean) = sp(ctx).edit().putBoolean("icsShow$i", v).apply()
+
+    private fun cacheFile(ctx: Context, i: Int) = java.io.File(ctx.filesDir, "cal_$i.ics")
+
+    private var rangeCache: Triple<String, Long, Map<LocalDate, List<CalEvent>>>? = null
+
+    /** Všechny události v rozsahu dnů (ze staženích kalendářů) – pro kartu Kalendář. */
+    @Synchronized
+    fun range(ctx: Context, from: LocalDate, to: LocalDate): Map<LocalDate, List<CalEvent>> {
+        val key = "$from|$to"
+        val stamp = fetchedAt(ctx)
+        rangeCache?.let { if (it.first == key && it.second == stamp) return it.third }
+        val days = generateSequence(from) { it.plusDays(1) }.takeWhile { !it.isAfter(to) }.toList()
+        val out = ArrayList<CalEvent>()
+        for (src in sources(ctx)) {
+            val f = cacheFile(ctx, src.idx)
+            if (!f.exists()) continue
+            try { out += parse(f.readText(), days).map { it.copy(src = src.idx) } } catch (e: Exception) { }
+        }
+        val map = out.groupBy { it.date }.mapValues { (_, l) -> l.sortedWith(compareBy({ it.time.isNotEmpty() }, { it.time })) }
+        rangeCache = Triple(key, stamp, map)
+        return map
+    }
 
     fun events(ctx: Context, date: LocalDate): List<CalEvent> {
         val s = sp(ctx).getString("icsEvents", null) ?: return emptyList()
         return try {
             val a = JSONArray(s)
             (0 until a.length()).map { a.getJSONObject(it) }
-                .map { CalEvent(LocalDate.parse(it.getString("d")), it.getString("t"), it.getString("s")) }
+                .map { CalEvent(LocalDate.parse(it.getString("d")), it.getString("t"), it.getString("s"), it.optInt("c", 0)) }
                 .filter { it.date == date }
                 .sortedWith(compareBy({ it.time.isNotEmpty() }, { it.time }))
         } catch (e: Exception) {
@@ -44,10 +90,39 @@ object CalendarIcs {
 
     /** Stáhne a zpracuje kalendář. Vrací null při úspěchu, jinak text chyby. */
     fun fetch(ctx: Context): String? {
-        var u = url(ctx)
-        if (u.isEmpty()) return "nevyplněno"
-        if (u.startsWith("webcal://")) u = "https://" + u.removePrefix("webcal://")
+        if (url(ctx).isEmpty()) return "nevyplněno"
+        // další kalendáře (chyba u nich nevadí hlavnímu)
+        val extra = ArrayList<CalEvent>()
+        val today0 = LocalDate.now()
+        for (src in sources(ctx).filter { it.idx > 0 }) {
+            try {
+                val t = download(src.url)
+                cacheFile(ctx, src.idx).writeText(t)
+                extra += parse(t, listOf(today0, today0.plusDays(1))).map { it.copy(src = src.idx) }
+            } catch (e: Exception) { }
+        }
+        (1..3).filter { i -> urlOf(ctx, i).isBlank() }.forEach { cacheFile(ctx, it).delete() }
         return try {
+            val text = download(url(ctx))
+            cacheFile(ctx, 0).writeText(text)
+            val today = LocalDate.now()
+            val list = parse(text, listOf(today, today.plusDays(1))) + extra
+            val a = JSONArray()
+            list.forEach { a.put(JSONObject().put("d", it.date.toString()).put("t", it.time).put("s", it.summary).put("c", it.src)) }
+            sp(ctx).edit().putString("icsEvents", a.toString()).putLong("icsTime", System.currentTimeMillis())
+                .remove("icsError").apply()
+            null
+        } catch (e: Exception) {
+            val msg = e.message ?: e.javaClass.simpleName
+            sp(ctx).edit().putString("icsError", msg).putLong("icsTime", System.currentTimeMillis()).apply()
+            msg
+        }
+    }
+
+    private fun download(url0: String): String {
+        var u = url0.trim()
+        if (u.startsWith("webcal://")) u = "https://" + u.removePrefix("webcal://")
+        return run {
             val conn = URL(u).openConnection() as HttpURLConnection
             conn.connectTimeout = 15_000
             conn.readTimeout = 30_000
@@ -60,17 +135,7 @@ object CalendarIcs {
             val text = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             conn.disconnect()
             if (!text.contains("BEGIN:VCALENDAR")) throw Exception("adresa nevrací kalendář iCal")
-            val today = LocalDate.now()
-            val list = parse(text, listOf(today, today.plusDays(1)))
-            val a = JSONArray()
-            list.forEach { a.put(JSONObject().put("d", it.date.toString()).put("t", it.time).put("s", it.summary)) }
-            sp(ctx).edit().putString("icsEvents", a.toString()).putLong("icsTime", System.currentTimeMillis())
-                .remove("icsError").apply()
-            null
-        } catch (e: Exception) {
-            val msg = e.message ?: e.javaClass.simpleName
-            sp(ctx).edit().putString("icsError", msg).putLong("icsTime", System.currentTimeMillis()).apply()
-            msg
+            text
         }
     }
 

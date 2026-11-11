@@ -25,6 +25,7 @@ class SettingsActivity : Activity() {
     private val numFields = ArrayList<Pair<EditText, (Float) -> Unit>>()
     private var scheduleSaver: (() -> Unit)? = null
     private var morningSaver: (() -> Unit)? = null
+    private var calSaver: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,6 +85,17 @@ class SettingsActivity : Activity() {
         mapy.setText(prefs.mapyKey)
         val ics = findViewById<EditText>(R.id.ics_url)
         ics.setText(CalendarIcs.url(this))
+        // další kalendáře (karta Kalendář na TV)
+        val icsNames = listOf(R.id.ics_name0, R.id.ics_name1, R.id.ics_name2, R.id.ics_name3).map { findViewById<EditText>(it) }
+        val icsUrls = listOf(null, R.id.ics_url1, R.id.ics_url2, R.id.ics_url3).map { id -> id?.let { findViewById<EditText>(it) } }
+        icsNames.forEachIndexed { i, e -> e.setText(CalendarIcs.name(this, i)) }
+        icsUrls.forEachIndexed { i, e -> e?.setText(CalendarIcs.urlOf(this, i)) }
+        calSaver = {
+            icsNames.forEachIndexed { i, e ->
+                val u = if (i == 0) ics.text.toString() else icsUrls[i]?.text?.toString() ?: ""
+                CalendarIcs.setSource(this, i, e.text.toString(), u)
+            }
+        }
         // 👁 – zobrazit / skrýt klíč
         listOf(
             R.id.eye_secret to R.id.access_secret, R.id.eye_mapy to R.id.mapy_key,
@@ -292,6 +304,8 @@ class SettingsActivity : Activity() {
         bindNum(R.id.tm_wind, mp.windFrom) { mp.windFrom = it }
         bindNum(R.id.tm_rain_mm, mp.rainMm) { mp.rainMm = it }
         bindNum(R.id.tm_rain_pct, mp.rainPct) { mp.rainPct = it }
+        bindNum(R.id.tm_warm, mp.warmDelta) { mp.warmDelta = it }
+        bindNum(R.id.tm_cool, mp.coolDelta) { mp.coolDelta = it }
 
         buildMenu()
 
@@ -320,6 +334,7 @@ class SettingsActivity : Activity() {
             prefs.owmKey = owm.text.toString()
             prefs.mapyKey = mapy.text.toString()
             CalendarIcs.setUrl(this, ics.text.toString())
+            calSaver?.invoke()
             nightFrom.text.toString().toIntOrNull()?.let { tv.nightFrom = it }
             nightTo.text.toString().toIntOrNull()?.let { tv.nightTo = it }
             if (credentialsChanged) prefs.clearToken()

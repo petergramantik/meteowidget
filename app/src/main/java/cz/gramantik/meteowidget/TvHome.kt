@@ -33,14 +33,15 @@ import kotlin.math.roundToInt
 class TvHome(private val ctx: Context, private val interactive: Boolean) {
 
     companion object {
-        val TABS = listOf("Dnes", "Zítra", "Předpověď", "Radar", "Doma", "⚙ Nastavení", "🔔")
+        val TABS = listOf("Dnes", "Zítra", "Kalendář", "Předpověď", "Radar", "Doma", "⚙ Nastavení", "🔔")
         const val TAB_TODAY = 0
         const val TAB_TOMORROW = 1
-        const val TAB_FORECAST = 2
-        const val TAB_RADAR = 3
-        const val TAB_HISTORY = 4
-        const val TAB_SETTINGS = 5
-        const val TAB_ALERTS = 6
+        const val TAB_CALENDAR = 2
+        const val TAB_FORECAST = 3
+        const val TAB_RADAR = 4
+        const val TAB_HISTORY = 5
+        const val TAB_SETTINGS = 6
+        const val TAB_ALERTS = 7
         /** výška dlaždic v levém panelu – stejná na kartách Dnes i Zítra */
         const val TILES_H = 80
         /** výška horní části s teplotami – stejná na kartách Dnes i Zítra */
@@ -365,7 +366,18 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         dcol.addView(c.label("10 DNÍ", C.BARO).apply { textSize = 9f })
         val dr = c.hbox(Gravity.TOP)
         val days = f?.days?.filter { !it.date.isBefore(today) }?.take(10) ?: emptyList()
+        val mpz = MorningPrefs(c)
         days.forEachIndexed { i, d ->
+            // výrazná změna proti předchozímu dni (oteplení oranžově, ochlazení modře)
+            val prev = f?.days?.firstOrNull { it.date == d.date.minusDays(1) }
+            val dMax = if (prev != null) d.tMax - prev.tMax else 0.0
+            val dMin = if (prev != null) d.tMin - prev.tMin else 0.0
+            fun col(delta: Double, normal: Int) = when {
+                delta >= mpz.warmDelta -> 0xFFFF9F43.toInt()
+                delta <= -mpz.coolDelta -> 0xFF4FC3F7.toInt()
+                else -> normal
+            }
+            val changed = dMax >= mpz.warmDelta || dMin >= mpz.warmDelta || dMax <= -mpz.coolDelta || dMin <= -mpz.coolDelta
             if (i > 0) dr.addView(sep(), c.lp(1, LinearLayout.LayoutParams.MATCH_PARENT))
             val name = when (d.date) {
                 today -> "Dnes"
@@ -374,8 +386,14 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             dr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
                 addView(c.text(name, 9f, C.LABEL), c.lp(WRAP, WRAP))
                 addView(c.icon(d.icon, 24), c.lp(c.dp(24), c.dp(24), top = 1))
-                addView(c.text(deg(d.tMax), 11f, C.IN, condensed = true), c.lp(WRAP, WRAP))
-                addView(c.text(deg(d.tMin), 10f, 0xFF8FB3FF.toInt(), condensed = true), c.lp(WRAP, WRAP))
+                addView(c.text(deg(d.tMax), 11f, col(dMax, C.IN), condensed = true, bold = col(dMax, 0) != 0), c.lp(WRAP, WRAP))
+                addView(c.text(deg(d.tMin), 10f, col(dMin, 0xFF8FB3FF.toInt()), condensed = true, bold = col(dMin, 0) != 0), c.lp(WRAP, WRAP))
+                if (changed) android.animation.ObjectAnimator.ofFloat(this, View.ALPHA, 1f, 0.4f).apply {
+                    duration = 1300
+                    repeatCount = android.animation.ValueAnimator.INFINITE
+                    repeatMode = android.animation.ValueAnimator.REVERSE
+                    start()
+                }
             }, c.lp(0, WRAP, 1f))
         }
         dcol.addView(dr, c.lp(top = 4))

@@ -7,6 +7,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.FrameLayout
 import cz.gramantik.meteowidget.ui.AlertsScreen
+import cz.gramantik.meteowidget.ui.CalendarScreen
+import cz.gramantik.meteowidget.ui.KeyHandler
 import cz.gramantik.meteowidget.ui.ForecastScreen
 import cz.gramantik.meteowidget.ui.RadarScreen
 import cz.gramantik.meteowidget.ui.StationScreen
@@ -158,7 +160,7 @@ class DashboardActivity : Activity() {
     private val cards = HashMap<Int, MainActivity.Screen>()
     private val cardHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var pendingCard: Runnable? = null
-    private fun isCard(i: Int) = i == TvHome.TAB_FORECAST || i == TvHome.TAB_RADAR || i == TvHome.TAB_HISTORY || i == TvHome.TAB_ALERTS
+    private fun isCard(i: Int) = i == TvHome.TAB_CALENDAR || i == TvHome.TAB_FORECAST || i == TvHome.TAB_RADAR || i == TvHome.TAB_HISTORY || i == TvHome.TAB_ALERTS
 
     /** Zobrazí kartu podle záložky (Dnes/Zítra = TV panel, ostatní vnořené obrazovky). */
     fun showCard(i: Int) {
@@ -177,6 +179,7 @@ class DashboardActivity : Activity() {
         // krátká prodleva, aby rychlé přejetí šipkou nic zbytečně nestavělo
         val r = Runnable {
             val s = cards[i] ?: when (i) {
+                TvHome.TAB_CALENDAR -> CalendarScreen(this)
                 TvHome.TAB_FORECAST -> ForecastScreen(this)
                 TvHome.TAB_RADAR -> RadarScreen(this)
                 TvHome.TAB_HISTORY -> StationScreen(this)
@@ -289,6 +292,8 @@ class DashboardActivity : Activity() {
             return true
         }
         if (inContent) {
+            // karta si může klávesy zpracovat sama (Kalendář – posun dnů a měsíců)
+            if ((cards[panel.home.activeTab] as? KeyHandler)?.onKey(event.keyCode) == true) return true
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (f is android.webkit.WebView) return super.dispatchKeyEvent(event)

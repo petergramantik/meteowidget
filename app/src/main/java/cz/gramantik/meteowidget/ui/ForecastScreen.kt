@@ -149,7 +149,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                 }
                 val hourLabel = if (h.time.hour == 0) h.time.format(DateTimeFormatter.ofPattern("d.M.")) else "${h.time.hour}:00"
                 cell.addView(a.text(hourLabel, 12f, if (h.time.hour == 0) C.ACCENT else C.LABEL, bold = h.time.hour == 0))
-                cell.addView(a.icon(h.icon, 40), a.lp(WRAP, WRAP, top = 4))
+                cell.addView(a.icon(h.icon, 40), a.lp(a.dp(40), a.dp(40), top = 4))
                 cell.addView(a.text(deg(h.temp), 17f, C.WHITE, condensed = true), a.lp(WRAP, WRAP, top = 2))
                 cell.addView(a.text(if (h.precip >= 0.1) "${f1(h.precip)} mm" else " ", 11f, C.RAIN), a.lp(WRAP, WRAP, top = 2))
                 cell.addView(a.text(if (h.prob >= 0) "${h.prob} %" else " ", 11f, C.RAIN))

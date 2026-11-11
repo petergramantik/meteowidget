@@ -84,7 +84,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             addView(c.text(deg(d.tMax), 30f, C.IN, condensed = true), c.lp(WRAP, WRAP, top = 2))
         }, c.lp(0, WRAP, 1f))
         head.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
-            addView(c.icon(d.icon, 38), c.lp(WRAP, WRAP, top = 2))
+            addView(c.icon(d.icon, 38), c.lp(c.dp(38), c.dp(38), top = 2))
             addView(c.text(ForecastFull.describe(d.code), 9f, C.WHITE, bold = true).apply {
                 gravity = Gravity.CENTER; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
             }, c.lp(WRAP, WRAP))
@@ -187,7 +187,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         lr.addView(col(p.channelName(Channel.IN), w?.tempIn, w?.humIn, C.IN, false), c.lp(0, WRAP, 1f))
         // uprostřed dnešní předpověď (jako na kartě Zítra)
         if (todayF != null) lr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
-            addView(c.icon(todayF.icon, 30), c.lp(WRAP, WRAP, top = 2))
+            addView(c.icon(todayF.icon, 30), c.lp(c.dp(30), c.dp(30), top = 2))
             addView(c.hbox(Gravity.BOTTOM).apply {
                 addView(c.text(deg(todayF.tMax), 13f, C.IN, condensed = true))
                 addView(c.text(" ${deg(todayF.tMin)}", 11f, 0xFF8FB3FF.toInt(), condensed = true))
@@ -328,7 +328,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             hr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
                 // zítra 16 hodin – užší buňky
                 addView(c.text(if (tomorrow) "${h.time.hour}" else "${h.time.hour}:00", 9f, C.LABEL), c.lp(WRAP, WRAP))
-                addView(c.icon(h.icon, if (tomorrow) 17 else 24), c.lp(WRAP, WRAP, top = 1))
+                val isz = if (tomorrow) 17 else 24
+                addView(c.icon(h.icon, isz), c.lp(c.dp(isz), c.dp(isz), top = 1))
                 addView(c.text(deg(h.temp), if (tomorrow) 10f else 12f, C.WHITE, condensed = true), c.lp(WRAP, WRAP))
                 addView(c.text(if (h.precip >= 0.1) f1(h.precip) else " ", if (tomorrow) 7f else 8f, C.RAIN), c.lp(WRAP, WRAP))
             }, c.lp(0, WRAP, 1f))
@@ -348,7 +349,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             }
             dr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
                 addView(c.text(name, 9f, C.LABEL), c.lp(WRAP, WRAP))
-                addView(c.icon(d.icon, 24), c.lp(WRAP, WRAP, top = 1))
+                addView(c.icon(d.icon, 24), c.lp(c.dp(24), c.dp(24), top = 1))
                 addView(c.text(deg(d.tMax), 11f, C.IN, condensed = true), c.lp(WRAP, WRAP))
                 addView(c.text(deg(d.tMin), 10f, 0xFF8FB3FF.toInt(), condensed = true), c.lp(WRAP, WRAP))
             }, c.lp(0, WRAP, 1f))

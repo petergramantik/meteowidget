@@ -373,12 +373,15 @@ fun TextView.bounce(): TextView {
     setHorizontallyScrolling(true)
     val speed = 22f * resources.displayMetrics.density // px/s
     val hold = 1500L
+    val baseGravity = gravity // při rolování od začátku, jinak původní (např. na střed)
+    val scrollGravity = (gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK) or android.view.Gravity.START
     val step = object : Runnable {
         override fun run() {
             if (!isAttachedToWindow) return
             val l = layout
             val over = if (l == null) 0f else l.getLineWidth(0) - (width - totalPaddingLeft - totalPaddingRight)
             if (over > 1f) {
+                if (gravity != scrollGravity) gravity = scrollGravity
                 val travel = (over / speed * 1000).toLong().coerceAtLeast(400)
                 val period = 2 * (travel + hold)
                 val ph = System.currentTimeMillis() % period
@@ -392,6 +395,7 @@ fun TextView.bounce(): TextView {
                 postDelayed(this, 40)
             } else {
                 if (scrollX != 0) scrollTo(0, 0)
+                if (gravity != baseGravity) gravity = baseGravity
                 postDelayed(this, 1000)
             }
         }

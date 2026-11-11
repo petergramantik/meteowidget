@@ -78,12 +78,16 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         tiles.chunked(3).forEachIndexed { ri, rowT ->
             val r = c.hbox(Gravity.TOP)
             rowT.forEachIndexed { k, (hd, sub) ->
-                r.addView(c.vbox().apply {
+                r.addView(c.vbox(Gravity.CENTER).apply {
                     background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
                     setPadding(c.dp(5), c.dp(2), c.dp(5), c.dp(2))
-                    addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
-                    addView(c.text(hd.second, 12f, hd.third, condensed = true).bounce(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
-                    if (sub.isNotEmpty()) addView(c.text(sub, 7f, C.DIM).bounce(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
+                    // obsah na střed dlaždice
+                    addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1; gravity = Gravity.CENTER },
+                        c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
+                    addView(c.text(hd.second, 12f, hd.third, condensed = true).apply { gravity = Gravity.CENTER }.bounce(),
+                        c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
+                    if (sub.isNotEmpty()) addView(c.text(sub, 7f, C.DIM).apply { gravity = Gravity.CENTER }.bounce(),
+                        c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
                 }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
             }
             g.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))

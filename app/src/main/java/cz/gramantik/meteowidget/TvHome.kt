@@ -73,29 +73,46 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
     /** Levý panel v pohledu Zítra: očekávané počasí. */
     private fun buildTomorrowLeft(left: LinearLayout, d: DayF?) {
         val c = ctx
-        val tmr = LocalDate.now().plusDays(1)
         if (d == null) {
             left.addView(c.text("Předpověď zatím není k dispozici", 12f, C.DIM), c.lp(top = 8))
             return
         }
-        val top = c.hbox()
-        top.addView(c.icon(d.icon, 50))
-        top.addView(c.vbox().apply {
-            addView(c.hbox(Gravity.BOTTOM).apply {
-                addView(c.text(deg(d.tMax), 34f, C.IN, condensed = true))
-                addView(c.text("  ${deg(d.tMin)}", 18f, 0xFF8FB3FF.toInt(), condensed = true))
-            })
-            addView(c.text(ForecastFull.describe(d.code), 11f, C.WHITE, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
-        }, c.lp(0, WRAP, 1f, start = 8))
-        left.addView(top)
-        fun line(s: String, color: Int = C.LABEL) =
-            left.addView(c.text(s, 10.5f, color, condensed = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, c.lp(top = 3))
-        line("Pocitově ${deg(d.feelsMax)} / ${deg(d.feelsMin)}", C.FEELS)
-        line("💨 vítr až ${d.windMax.roundToInt()} km/h · nárazy ${d.gustMax.roundToInt()} · ${ForecastFull.windDir(d.dir)}", C.WIND)
-        line("☔ srážky ${f1(d.precip)} mm · ${d.prob} %" + (if (d.snow >= 0.1) " · sníh ${f1(d.snow)} cm" else ""), C.RAIN)
-        line("UV max ${f1(d.uvMax)} · slunce ${f1(d.sunshineH)} h", C.UV)
+        // hlavička uprostřed: ikona, max/min, popis
+        val head = c.hbox(Gravity.CENTER)
+        head.addView(c.icon(d.icon, 40))
+        head.addView(c.hbox(Gravity.BOTTOM).apply {
+            addView(c.text(deg(d.tMax), 28f, C.IN, condensed = true))
+            addView(c.text("  ${deg(d.tMin)}", 16f, 0xFF8FB3FF.toInt(), condensed = true))
+        }, c.lp(WRAP, WRAP, start = 8))
+        left.addView(head, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
+        left.addView(c.text(ForecastFull.describe(d.code), 10.5f, C.WHITE, bold = true).apply {
+            gravity = Gravity.CENTER; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+        }, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, bottom = 4))
+        // zmenšené dlaždice 3 × 2
         val tf = java.time.format.DateTimeFormatter.ofPattern("H:mm")
-        line("🌅 ${d.sunrise?.let { tf.format(it) } ?: "--"}   🌇 ${d.sunset?.let { tf.format(it) } ?: "--"}", C.LIGHT)
+        val tiles = listOf(
+            Triple("POCITOVĚ", "${deg(d.feelsMax)} / ${deg(d.feelsMin)}", C.FEELS) to "",
+            Triple("VÍTR", "${d.windMax.roundToInt()} km/h", C.WIND) to "nárazy ${d.gustMax.roundToInt()} · ${ForecastFull.windDir(d.dir)}",
+            Triple("SRÁŽKY", "${f1(d.precip)} mm", C.RAIN) to ("${d.prob.coerceAtLeast(0)} %" + if (d.snow >= 0.1) " · sníh ${f1(d.snow)} cm" else ""),
+            Triple("UV MAX", f1(d.uvMax), C.UV) to "",
+            Triple("SLUNCE", "${f1(d.sunshineH)} h", C.ACCENT) to "svit",
+            Triple("VÝCHOD / ZÁPAD", "${d.sunrise?.let { tf.format(it) } ?: "--"} – ${d.sunset?.let { tf.format(it) } ?: "--"}", C.LIGHT) to "",
+        )
+        val grid = c.vbox()
+        tiles.chunked(3).forEachIndexed { ri, row ->
+            val r = c.hbox(Gravity.TOP)
+            row.forEachIndexed { k, (hd, sub) ->
+                r.addView(c.vbox().apply {
+                    background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
+                    setPadding(c.dp(5), c.dp(3), c.dp(4), c.dp(3))
+                    addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
+                    addView(c.text(hd.second, 12f, hd.third, condensed = true).apply { maxLines = 1 }, c.lp(WRAP, WRAP, top = 1))
+                    addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
+            }
+            grid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 4 else 0))
+        }
+        left.addView(grid, c.lp(h = 0, weight = 1f))
     }
 
     fun build(animated: Boolean): View {

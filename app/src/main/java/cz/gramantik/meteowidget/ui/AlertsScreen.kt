@@ -92,7 +92,7 @@ class AlertsScreen(private val a: Activity) : MainActivity.Screen {
                 refresh()
             }.apply { tvFocus() }, a.lp(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
-        content.addView(a.text("Přejetím doleva zpět na Stanici", 11f, C.DIM), a.lp(top = 12))
+        content.addView(a.text(if (a.isTv()) "Zpět nebo šipkou → na Dnes" else "Přejetím doleva zpět na Stanici", 11f, C.DIM), a.lp(top = 12))
     }
 
     /** Přechod na související místo podle druhu upozornění. */

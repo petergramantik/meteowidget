@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private val tabs = ArrayList<ImageView>()
     private var screens = arrayOfNulls<Screen>(4) // 3 = Upozornění (mimo dolní menu)
     private lateinit var badge: TextView
+    private var alertBtn: ImageView? = null
     private var current = 0
     private lateinit var title: TextView
     private lateinit var refreshBtn: ImageView
@@ -66,7 +67,8 @@ class MainActivity : Activity() {
         bar.addView(title, lp(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         // zvoneček s počtem nepřečtených upozornění
         val bell = FrameLayout(this).apply {
-            addView(barButton(R.drawable.ic_bell) { openTab(if (current == 3) 0 else 3) })
+            alertBtn = barButton(R.drawable.ic_alert) { openTab(if (current == 3) 0 else 3) }
+            addView(alertBtn)
             badge = text("", 10f, C.BG, bold = true).apply {
                 gravity = Gravity.CENTER
                 background = rounded(0xFFFF5252.toInt(), dp(8).toFloat())
@@ -192,6 +194,8 @@ class MainActivity : Activity() {
         val n = NotifyLog.unread(this)
         badge.text = if (n > 99) "99+" else n.toString()
         badge.visibility = if (n > 0) View.VISIBLE else View.GONE
+        // vykřičník: žlutý při nepřečtených upozorněních, jinak šedý
+        alertBtn?.setColorFilter(if (n > 0) C.ACCENT else C.DIM)
     }
 
     /**

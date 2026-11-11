@@ -49,6 +49,8 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
     override val view: View = root
 
     private var detailBox: LinearLayout? = null
+    /** tag prvku, na který se má po (asynchronním) překreslení vrátit výběr */
+    private var pendingFocus: Any? = null
     private val cells = HashMap<LocalDate, View>()
     private val monthBoxes = HashMap<YearMonth, View>()
 
@@ -56,7 +58,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
 
     override fun refresh() {
         // focus po překreslení vrátit na vybraný den / tlačítko
-        val focusTag = root.findFocus()?.tag
+        if (pendingFocus == null) root.findFocus()?.tag?.let { pendingFocus = it }
         root.removeAllViews()
         cells.clear()
         monthBoxes.clear()
@@ -69,6 +71,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
             root.addView(a.text("Kalendář není nastavený – vlož iCal adresu v Nastavení → 🔑 Klíče a přístupy.", 14f, C.DIM), a.lp(top = 20))
             return
         }
+        // tlačítka v liště se při načítání přestaví – výběr na nich musí zůstat
         val (from, to) = range()
         val key = "$from|$to|${CalendarIcs.fetchedAt(a)}"
         if (key != loadedKey) {
@@ -88,6 +91,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
                 }.start()
             }
             root.addView(a.text("Načítám kalendář…", 14f, C.DIM), a.lp(top = 20))
+            pendingFocus?.let { t -> root.findViewWithTag<View>(t)?.let { v -> v.post { v.requestFocus() } } }
             return
         }
         val body = when (mode) {
@@ -96,8 +100,10 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
             Mode.M1 -> monthView()
         }
         root.addView(body, a.lp(h = 0, weight = 1f, top = 4))
-        val target = focusTag?.let { root.findViewWithTag<View>(it) }
-            ?: if (focusTag != null && focusTag.toString().startsWith("d_")) cells[selected] else null
+        val ft = pendingFocus
+        pendingFocus = null
+        val target = ft?.let { root.findViewWithTag<View>(it) }
+            ?: if (ft != null && (ft.toString().startsWith("d_") || ft.toString().startsWith("m_"))) (cells[selected] ?: monthBoxes[YearMonth.from(selected)]) else null
         target?.let { v -> v.post { v.requestFocus() } }
     }
 
@@ -244,7 +250,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
                 setPadding(a.dp(3), 0, a.dp(3), 0)
             }.also { it.layoutParams = a.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, top = 1) }
         } else {
-            a.text("${e.time} ${e.summary}", if (small) 7.5f else 9f, col).apply {
+            a.text(if (small) e.summary else "${e.time} ${e.summary}", if (small) 7.5f else 9f, col).apply {
                 maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
             }
         }
@@ -422,6 +428,31 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
     }
 
     // ---------- ovladač ----------
+    /** Sousední prvek v daném směru ze stejné skupiny (dny / měsíce), nebo null na okraji. */
+    private fun neighbor(from: View, pool: Collection<View>, dx: Int, dy: Int): View? {
+        val f = IntArray(2).also { from.getLocationOnScreen(it) }
+        val fcx = f[0] + from.width / 2f
+        val fcy = f[1] + from.height / 2f
+        var best: View? = null
+        var bestD = Float.MAX_VALUE
+        for (v in pool) {
+            if (v === from || !v.isShown) continue
+            val l = IntArray(2).also { v.getLocationOnScreen(it) }
+            val cx = l[0] + v.width / 2f
+            val cy = l[1] + v.height / 2f
+            val ok = when {
+                dx > 0 -> cx > fcx + from.width / 2f && kotlin.math.abs(cy - fcy) < from.height / 2f
+                dx < 0 -> cx < fcx - from.width / 2f && kotlin.math.abs(cy - fcy) < from.height / 2f
+                dy > 0 -> cy > fcy + from.height / 2f && kotlin.math.abs(cx - fcx) < from.width
+                else -> cy < fcy - from.height / 2f && kotlin.math.abs(cx - fcx) < from.width
+            }
+            if (!ok) continue
+            val d = kotlin.math.abs(cx - fcx) + kotlin.math.abs(cy - fcy)
+            if (d < bestD) { bestD = d; best = v }
+        }
+        return best
+    }
+
     override fun onKey(keyCode: Int): Boolean {
         val f = root.findFocus() ?: return false
         val tag = f.tag?.toString() ?: return false
@@ -436,31 +467,37 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
             else -> 0
         }
         if (dx == 0 && dy == 0) return false
-        if (tag.startsWith("d_")) {
-            val d = LocalDate.parse(tag.removePrefix("d_"))
-            val t = d.plusDays((dx + dy * 7).toLong())
-            cells[t]?.let { it.requestFocus(); return true }
-            if (dy < 0) return false // nahoru z prvního řádku -> lišta
-            if (dy > 0 && mode == Mode.M3) return true
-            // mimo zobrazené měsíce -> posunout
-            selected = t
-            anchor = if (t.isBefore(d)) anchor.minusMonths(1) else anchor.plusMonths(1)
-            refresh()
-            cells[t]?.let { v -> v.post { v.requestFocus() } }
-            return true
-        }
-        if (tag.startsWith("m_")) {
+        val isDay = tag.startsWith("d_")
+        val isMonth = tag.startsWith("m_")
+        if (!isDay && !isMonth) return false
+        val pool: Collection<View> = if (isDay) cells.values else monthBoxes.values
+        neighbor(f, pool, dx, dy)?.let { it.requestFocus(); return true }
+        // okraj
+        if (dy < 0) return false // nahoru -> tlačítka v liště
+        val step = if (dx != 0) dx else dy
+        if (isMonth) {
+            // rok: vlevo / vpravo (i dolů z posledního řádku) -> další / předchozí rok
             val m = YearMonth.parse(tag.removePrefix("m_"))
-            val t = m.plusMonths((dx + dy * 6).toLong())
-            monthBoxes[t]?.let { it.requestFocus(); return true }
-            if (dy < 0) return false
-            if (dy > 0) return true
+            val t = YearMonth.of(m.year + step, m.monthValue)
             anchor = YearMonth.of(t.year, 1)
             selected = t.atDay(1)
-            refresh()
-            monthBoxes[t]?.let { v -> v.post { v.requestFocus() } }
-            return true
+            pendingFocus = "m_$t"
+        } else {
+            // měsíc / 3 měsíce: posun o měsíc, výběr ve stejném řádku a dni v týdnu
+            val d = LocalDate.parse(tag.removePrefix("d_"))
+            anchor = anchor.plusMonths(step.toLong())
+            var t = d.plusMonths(step.toLong())
+            if (dx != 0) t = t.with(java.time.temporal.TemporalAdjusters.nextOrSame(if (dx > 0) DayOfWeek.MONDAY else DayOfWeek.SUNDAY))
+                .let { x -> if (dx < 0) x.minusDays(0) else x }
+            // zůstat uvnitř zobrazených měsíců
+            val first = anchor.atDay(1)
+            val last = (if (mode == Mode.M3) anchor.plusMonths(2) else anchor).atEndOfMonth()
+            if (t.isBefore(first)) t = first
+            if (t.isAfter(last)) t = last
+            selected = t
+            pendingFocus = "d_$t"
         }
-        return false
+        refresh()
+        return true
     }
 }

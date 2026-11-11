@@ -207,7 +207,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         if (interactive) {
             val unread = NotifyLog.unread(c)
             TABS.forEachIndexed { i, name0 ->
-                val name = if (i == TAB_ALERTS && unread > 0) "🔔 $unread" else name0
+                val name = if (i == TAB_ALERTS) (if (unread > 0) "$unread" else "") else name0
                 if (i == TAB_ALERTS) top.addView(View(c), c.lp(0, 1, 1f)) // zvoneček vpravo u hodin
                 val tv = c.text(name, 11f, C.WHITE, bold = true).apply {
                     setPadding(c.dp(10), c.dp(4), c.dp(10), c.dp(4))
@@ -217,13 +217,28 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                     // vybraná (focus): žlutá výplň; zobrazená karta bez focusu: žlutý text a rámeček
                     fun style(has: Boolean) {
                         val active = i == activeTab
-                        setTextColor(if (has) C.BG else if (active) C.ACCENT else if (i == TAB_ALERTS && unread > 0) 0xFFFF8A80.toInt() else C.WHITE)
+                        setTextColor(if (has) C.BG else if (active) C.ACCENT else if (i == TAB_ALERTS) (if (unread > 0) C.ACCENT else C.DIM) else C.WHITE)
                         background = rounded(if (has) C.ACCENT else C.CARD2, c.dp(12).toFloat(), c.dp(1),
                             if (has || active) C.ACCENT else C.LINE)
                     }
-                    style(false)
-                    tabStylers.add { has -> style(has) }
-                    setOnFocusChangeListener { _, has -> style(has) }
+                    if (i == TAB_ALERTS) {
+                        // vykřičník místo zvonečku – žlutý s počtem, jinak šedý
+                        val icon = c.getDrawable(R.drawable.ic_alert)?.mutate()
+                        icon?.setBounds(0, 0, c.dp(15), c.dp(15))
+                        compoundDrawablePadding = if (unread > 0) c.dp(4) else 0
+                        setCompoundDrawables(icon, null, null, null)
+                        val st: (Boolean) -> Unit = { has ->
+                            style(has)
+                            icon?.setTint(if (has) C.BG else if (unread > 0) C.ACCENT else C.DIM)
+                        }
+                        st(false)
+                        tabStylers.add(st)
+                        setOnFocusChangeListener { _, has -> st(has) }
+                    } else {
+                        style(false)
+                        tabStylers.add { has -> style(has) }
+                        setOnFocusChangeListener { _, has -> style(has) }
+                    }
                 }
                 tabViews.add(tv)
                 top.addView(tv, c.lp(WRAP, WRAP, end = 6))

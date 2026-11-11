@@ -41,6 +41,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         const val TAB_HISTORY = 4
         const val TAB_SETTINGS = 5
         const val TAB_ALERTS = 6
+        /** výška dlaždic v levém panelu – stejná na kartách Dnes i Zítra */
+        const val TILES_H = 80
     }
 
     private val cz = Locale("cs", "CZ")
@@ -116,9 +118,55 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                     addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
                 }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
             }
-            grid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 4 else 0))
+            grid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))
         }
-        left.addView(grid, c.lp(h = 0, weight = 1f))
+        // ráno · odpoledne · večer
+        val f = ForecastFull.load(c)
+        val tmr = LocalDate.now().plusDays(1)
+        val parts = listOf(7 to "RÁNO", 14 to "ODPOLEDNE", 20 to "VEČER").mapNotNull { (hh, name) ->
+            f?.hours?.firstOrNull { it.time.toLocalDate() == tmr && it.time.hour == hh }?.let { name to it }
+        }
+        if (parts.isNotEmpty()) {
+            left.addView(View(c).apply { setBackgroundColor(C.LINE) }, c.lp(h = 1, bottom = 3))
+            val pr = c.hbox(Gravity.TOP)
+            parts.forEachIndexed { k, (name, h) ->
+                if (k > 0) pr.addView(sep(), c.lp(1, LinearLayout.LayoutParams.MATCH_PARENT))
+                pr.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
+                    addView(c.label("$name ${h.time.hour}:00").apply { textSize = 7.5f }, c.lp(WRAP, WRAP))
+                    addView(c.hbox(Gravity.CENTER_VERTICAL).apply {
+                        addView(c.icon(h.icon, 24), c.lp(c.dp(24), c.dp(24)))
+                        addView(c.text(deg(h.temp), 15f, C.WHITE, condensed = true), c.lp(WRAP, WRAP, start = 4))
+                    }, c.lp(WRAP, WRAP))
+                    addView(c.text(if (h.precip >= 0.1) "${f1(h.precip)} mm" else " ", 7.5f, C.RAIN), c.lp(WRAP, WRAP))
+                }, c.lp(0, WRAP, 1f))
+            }
+            left.addView(pr)
+        }
+        // srovnání s dneškem – střídá se s prolínáním
+        val td = f?.days?.firstOrNull { it.date == LocalDate.now() }
+        val cmp = ArrayList<String>()
+        if (td != null) {
+            val dt = (d.tMax - td.tMax).roundToInt()
+            if (dt >= 1) cmp += "O $dt° tepleji než dnes" else if (dt <= -1) cmp += "O ${-dt}° chladněji než dnes"
+            when {
+                d.precip >= 0.5 && d.precip > td.precip + 0.5 -> cmp += "Víc srážek než dnes (${f1(d.precip)} mm)"
+                d.precip < 0.1 && td.precip >= 0.5 -> cmp += "Zítra bez srážek"
+                td.precip >= 0.5 && d.precip < td.precip - 0.5 -> cmp += "Méně srážek než dnes (${f1(d.precip)} mm)"
+            }
+            val dg = d.gustMax - td.gustMax
+            if (dg >= 10) cmp += "Silnější vítr – nárazy až ${d.gustMax.roundToInt()} km/h"
+            else if (dg <= -10) cmp += "Slabší vítr – nárazy do ${d.gustMax.roundToInt()} km/h"
+            val ds = d.sunshineH - td.sunshineH
+            if (ds >= 2) cmp += "Víc slunce – ${f1(d.sunshineH)} h svitu (dnes ${f1(td.sunshineH)} h)"
+            else if (ds <= -2) cmp += "Méně slunce – ${f1(d.sunshineH)} h svitu (dnes ${f1(td.sunshineH)} h)"
+            if (cmp.isEmpty()) cmp += "Podobné počasí jako dnes"
+        }
+        if (cmp.isNotEmpty()) left.addView(FadeCycler(c, cmp).apply {
+            textSize = 10f; setTextColor(C.ACCENT); gravity = Gravity.CENTER
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, top = 3))
+        left.addView(View(c), c.lp(h = 0, weight = 1f))
+        left.addView(grid, c.lp(h = c.dp(TILES_H), top = 4))
     }
 
     fun build(animated: Boolean): View {
@@ -251,7 +299,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             }
             lgrid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))
         }
-        left.addView(lgrid, c.lp(h = 0, weight = 1f, top = 4))
+        left.addView(View(c), c.lp(h = 0, weight = 1f))
+        left.addView(lgrid, c.lp(h = c.dp(TILES_H), top = 4))
         if (p.lastError != null) left.addView(c.text(friendlyError(p.lastError, p.lastUpdate) ?: "", 9f, C.ACCENT), c.lp(top = 3))
         else if (p.lastUpdate > 0 && System.currentTimeMillis() - p.lastUpdate > 15 * 60_000)
             left.addView(c.text("⚠ data z " + java.text.SimpleDateFormat("HH:mm", cz).format(Date(p.lastUpdate)), 9f, C.ACCENT), c.lp(top = 3))

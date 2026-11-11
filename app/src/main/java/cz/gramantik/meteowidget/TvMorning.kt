@@ -385,3 +385,37 @@ class AutoScroll(ctx: Context) : ScrollView(ctx) {
         super.onDetachedFromWindow()
     }
 }
+
+/** Text, který střídá několik informací s plynulým prolínáním (bez rolování). */
+class FadeCycler(ctx: Context, private val items: List<String>) : TextView(ctx) {
+    private var idx = ((System.currentTimeMillis() / 4500) % items.size.coerceAtLeast(1)).toInt()
+    private val step = object : Runnable {
+        override fun run() {
+            if (!isAttachedToWindow || items.size < 2) return
+            animate().alpha(0f).setDuration(450).withEndAction {
+                idx = (idx + 1) % items.size
+                text = items[idx]
+                animate().alpha(1f).setDuration(450).start()
+            }.start()
+            postDelayed(this, 4500)
+        }
+    }
+
+    init {
+        maxLines = 1
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        text = items.getOrNull(idx) ?: ""
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        removeCallbacks(step)
+        postDelayed(step, 4500)
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(step)
+        animate().cancel()
+        super.onDetachedFromWindow()
+    }
+}

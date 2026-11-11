@@ -77,17 +77,23 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             left.addView(c.text("Předpověď zatím není k dispozici", 12f, C.DIM), c.lp(top = 8))
             return
         }
-        // hlavička uprostřed: ikona, max/min, popis
-        val head = c.hbox(Gravity.CENTER)
-        head.addView(c.icon(d.icon, 40))
-        head.addView(c.hbox(Gravity.BOTTOM).apply {
-            addView(c.text(deg(d.tMax), 28f, C.IN, condensed = true))
-            addView(c.text("  ${deg(d.tMin)}", 16f, 0xFF8FB3FF.toInt(), condensed = true))
-        }, c.lp(WRAP, WRAP, start = 8))
-        left.addView(head, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
-        left.addView(c.text(ForecastFull.describe(d.code), 10.5f, C.WHITE, bold = true).apply {
-            gravity = Gravity.CENTER; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
-        }, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, bottom = 4))
+        // hlavička jako na Dnes: MAX vlevo, ikona + popis uprostřed, MIN vpravo
+        val head = c.hbox(Gravity.TOP)
+        head.addView(c.vbox(Gravity.START).apply {
+            addView(c.label("MAX"), c.lp(WRAP, WRAP))
+            addView(c.text(deg(d.tMax), 30f, C.IN, condensed = true), c.lp(WRAP, WRAP, top = 2))
+        }, c.lp(0, WRAP, 1f))
+        head.addView(c.vbox(Gravity.CENTER_HORIZONTAL).apply {
+            addView(c.icon(d.icon, 38), c.lp(WRAP, WRAP, top = 2))
+            addView(c.text(ForecastFull.describe(d.code), 9f, C.WHITE, bold = true).apply {
+                gravity = Gravity.CENTER; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
+            }, c.lp(WRAP, WRAP))
+        }, c.lp(c.dp(84), WRAP))
+        head.addView(c.vbox(Gravity.END).apply {
+            addView(c.label("MIN"), c.lp(WRAP, WRAP))
+            addView(c.text(deg(d.tMin), 30f, 0xFF8FB3FF.toInt(), condensed = true), c.lp(WRAP, WRAP, top = 2))
+        }, c.lp(0, WRAP, 1f))
+        left.addView(head, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, bottom = 4))
         // zmenšené dlaždice 3 × 2
         val tf = java.time.format.DateTimeFormatter.ofPattern("H:mm")
         val tiles = listOf(
@@ -214,28 +220,38 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                 }
             }
         }
-        // dnešní min/max venku
+        // dlaždice 3 × 2 (jako na kartě Zítra)
         val db = MeteoDb.get(c)
         val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val now = System.currentTimeMillis()
-        val mn = db.extreme("tout", start, now, false)
-        val mx = db.extreme("tout", start, now, true)
-        if (mn != null && mx != null) {
-            val tf = SimpleDateFormat("HH:mm", cz)
-            left.addView(c.text("venku dnes ↓ ${f1(mn.second)}° ${tf.format(Date(mn.first))}   ↑ ${f1(mx.second)}° ${tf.format(Date(mx.first))}", 9f, C.DIM), c.lp(top = 3))
+        val nowMs = System.currentTimeMillis()
+        val mn = db.extreme("tout", start, nowMs, false)
+        val mx = db.extreme("tout", start, nowMs, true)
+        val hm = SimpleDateFormat("H:mm", cz)
+        val tiles = listOf(
+            Triple("POCITOVĚ", t(w?.feelsLike), C.FEELS) to (todayF?.let { "dnes ${deg(it.feelsMax)} / ${deg(it.feelsMin)}" } ?: "rosný bod ${t(w?.dewPoint)}"),
+            Triple("VÍTR", "${f1(w?.windAvg)} km/h", C.WIND) to ("nárazy ${f1(w?.windGust)}" + (todayF?.let { " · až ${it.gustMax.roundToInt()}" } ?: "")),
+            Triple("SRÁŽKY DNES", "${f1(w?.rainDay)} mm", C.RAIN) to (w?.rainRate?.takeIf { it > 0 }?.let { "prší ${f1(it)} mm/h" }
+                ?: todayF?.let { "předpověď ${f1(it.precip)} mm · ${it.prob.coerceAtLeast(0)} %" } ?: "neprší"),
+            Triple("TLAK", (w?.pressure?.let { String.format(cz, "%.0f", it) } ?: "--") + " hPa$arrow", C.BARO) to (trend?.let { "za 3 h " + String.format(cz, "%+.1f", it) } ?: ""),
+            Triple("UV", f1(w?.uv), C.UV) to (todayF?.let { "max ${f1(it.uvMax)} · svit ${f1(it.sunshineH)} h" } ?: ""),
+            Triple("VENKU DNES", if (mn != null && mx != null) "${f1(mn.second)}° / ${f1(mx.second)}°" else "--", C.OUT) to
+                (if (mn != null && mx != null) "↓ ${hm.format(Date(mn.first))} · ↑ ${hm.format(Date(mx.first))}" else ""),
+        )
+        val lgrid = c.vbox()
+        tiles.chunked(3).forEachIndexed { ri, rowT ->
+            val r = c.hbox(Gravity.TOP)
+            rowT.forEachIndexed { k, (hd, sub) ->
+                r.addView(c.vbox().apply {
+                    background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
+                    setPadding(c.dp(5), c.dp(2), c.dp(4), c.dp(2))
+                    addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
+                    addView(c.text(hd.second, 11.5f, hd.third, condensed = true).apply { maxLines = 1 })
+                    addView(c.text(sub.ifEmpty { " " }, 7f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
+            }
+            lgrid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))
         }
-        if (!morning) Alerts.load(c).firstOrNull()?.let { al ->
-            left.addView(c.text("⚠ ${al.event} · ${SimpleDateFormat("EEE HH:mm", cz).format(Date(al.onset))}–${SimpleDateFormat("HH:mm", cz).format(Date(al.expires))}", 10f, al.color, bold = true), c.lp(top = 3))
-        }
-        // dnešní předpověď – ostatní údaje
-        todayF?.let { d ->
-            left.addView(c.text("Pocitově ${deg(d.feelsMax)} / ${deg(d.feelsMin)} · ☔ ${f1(d.precip)} mm · ${d.prob.coerceAtLeast(0)} % · ☀ ${f1(d.sunshineH)} h",
-                8.5f, C.FEELS, condensed = true).apply { maxLines = 1 }, c.lp(top = 2))
-        }
-        val windLine = "💨 teď ${f1(w?.windAvg)}" + (todayF?.let { " · dnes až ${it.windMax.roundToInt()} (${it.gustMax.roundToInt()})" } ?: "") +
-            " km/h · " + (w?.pressure?.let { String.format(cz, "%.0f", it) } ?: "--") + " hPa$arrow · UV " +
-            (todayF?.let { f1(it.uvMax) } ?: f1(w?.uv))
-        left.addView(c.text(windLine, 8.5f, C.WIND, condensed = true).apply { maxLines = 1 }, c.lp(top = 1))
+        left.addView(lgrid, c.lp(h = 0, weight = 1f, top = 4))
         if (p.lastError != null) left.addView(c.text(friendlyError(p.lastError, p.lastUpdate) ?: "", 9f, C.ACCENT), c.lp(top = 3))
         else if (p.lastUpdate > 0 && System.currentTimeMillis() - p.lastUpdate > 15 * 60_000)
             left.addView(c.text("⚠ data z " + java.text.SimpleDateFormat("HH:mm", cz).format(Date(p.lastUpdate)), 9f, C.ACCENT), c.lp(top = 3))
@@ -249,32 +265,6 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             row.addView(TvMorning.build(c, 168))
         } else {
 
-        // uprostřed: dlaždice 2×3
-        val tiles = listOf(
-            Triple("VÍTR", "${f1(w?.windAvg)} km/h", C.WIND) to (w?.windGust?.let { "nárazy ${f1(it)}" } ?: ""),
-            Triple("SRÁŽKY DNES", "${f1(w?.rainDay)} mm", C.RAIN) to (w?.rainRate?.takeIf { it > 0 }?.let { "prší ${f1(it)} mm/h" } ?: "neprší"),
-            Triple("TLAK", (w?.pressure?.let { String.format(cz, "%.0f", it) } ?: "--") + " hPa$arrow", C.BARO) to (trend?.let { "za 3 h " + String.format(cz, "%+.1f", it) } ?: ""),
-            Triple("POCITOVĚ", t(w?.feelsLike), C.FEELS) to "rosný bod ${t(w?.dewPoint)}",
-            Triple("UV", f1(w?.uv), C.UV) to "",
-            Triple("SVĚTLO", "${f1(w?.lightKlux)} klux", C.LIGHT) to "",
-        )
-        val grid = c.vbox()
-        tiles.chunked(2).forEachIndexed { ri, pair ->
-            val r = c.hbox(Gravity.TOP)
-            pair.forEachIndexed { i, (head, sub) ->
-                val tile = c.vbox().apply {
-                    background = rounded(C.CARD, c.dp(9).toFloat(), c.dp(1), C.LINE)
-                    setPadding(c.dp(7), c.dp(4), c.dp(6), c.dp(4))
-                    addView(c.label(head.first).apply { textSize = 8f })
-                    addView(c.text(head.second, 15f, head.third, condensed = true), c.lp(WRAP, WRAP, top = 2))
-                    addView(c.text(sub, 8f, C.DIM))
-                }
-                r.addView(tile, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (i == 0) 5 else 0))
-            }
-            // tři řady přesně na výšku sousedních panelů (168 dp)
-            grid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri < 2) 5 else 0))
-        }
-        row.addView(grid, c.lp(c.dp(170), c.dp(168), end = 8))
 
         // vpravo: Dnes – svátek, kalendář, teď
         val right = panel()
@@ -288,14 +278,19 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             if (evs.isEmpty()) right.addView(c.text("Dnes ani zítra nic v kalendáři", 10f, C.DIM))
             else {
                 if (evs.first().second) right.addView(c.text("Zítra:", 9f, C.ACCENT, bold = true))
-                evs.take(4).forEach { (e, _) ->
+                evs.take(6).forEach { (e, _) ->
                     val r = c.hbox(Gravity.TOP)
                     r.addView(c.text(e.time.ifEmpty { "celý den" }, 10f, C.ACCENT, condensed = true), c.lp(c.dp(38), WRAP))
                     r.addView(c.text(e.summary, 10f, C.WHITE).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, c.lp(0, WRAP, 1f))
                     right.addView(r)
                 }
-                if (evs.size > 4) right.addView(c.text("+ další ${evs.size - 4}", 9f, C.DIM))
+                if (evs.size > 6) right.addView(c.text("+ další ${evs.size - 6}", 9f, C.DIM))
             }
+        }
+        // výstraha ČHMÚ (dříve v levém panelu)
+        Alerts.load(c).firstOrNull { it.expires > System.currentTimeMillis() }?.let { al ->
+            right.addView(c.text("⚠ ${al.event} · ${SimpleDateFormat("EEE HH:mm", cz).format(Date(al.onset))}–${SimpleDateFormat("HH:mm", cz).format(Date(al.expires))}",
+                10f, al.color, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }, c.lp(top = 4))
         }
         // teď
         hours.firstOrNull()?.let { h ->

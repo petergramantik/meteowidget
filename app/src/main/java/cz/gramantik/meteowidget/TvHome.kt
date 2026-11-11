@@ -71,6 +71,14 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         setPadding(ctx.dp(10), ctx.dp(7), ctx.dp(10), ctx.dp(7))
     }
 
+    /** text, který se nevejde, pomalu roluje do strany (kratší stojí) */
+    private fun TextView.marquee() = apply {
+        setSingleLine()
+        ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
+        marqueeRepeatLimit = -1
+        isSelected = true
+    }
+
     /** tenká svislá dělicí linka mezi sloupci předpovědi */
     private fun sep() = View(ctx).apply { setBackgroundColor(0x1FFFFFFF) }
 
@@ -118,8 +126,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                     background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
                     setPadding(c.dp(5), c.dp(3), c.dp(4), c.dp(3))
                     addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
-                    addView(c.text(hd.second, 13f, hd.third, condensed = true).apply { maxLines = 1 }, c.lp(WRAP, WRAP, top = 1))
-                    addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                    addView(c.text(hd.second, 13f, hd.third, condensed = true).marquee(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, top = 1))
+                    addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).marquee(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
                 }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
             }
             grid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))
@@ -312,8 +320,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                     background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
                     setPadding(c.dp(5), c.dp(2), c.dp(4), c.dp(2))
                     addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
-                    addView(c.text(hd.second, 13f, hd.third, condensed = true).apply { maxLines = 1 })
-                    addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                    addView(c.text(hd.second, 13f, hd.third, condensed = true).marquee(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
+                    addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).marquee(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
                 }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
             }
             lgrid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))

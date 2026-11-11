@@ -26,8 +26,8 @@ class RainStripView(ctx: Context) : View(ctx) {
     var wind: DoubleArray? = null
     var windDir = DoubleArray(12) { Double.NaN }
     var strongWind = 50.0
-    private val windTxt = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f * d; textAlign = Paint.Align.CENTER; isFakeBoldText = true }
-    private val arrowP = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.3f * d; strokeCap = Paint.Cap.ROUND }
+    private val windTxt = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f * ctx.resources.displayMetrics.density; textAlign = Paint.Align.CENTER; isFakeBoldText = true }
+    private val arrowP = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.3f * ctx.resources.displayMetrics.density; strokeCap = Paint.Cap.ROUND }
 
     private val d = ctx.resources.displayMetrics.density
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x24FFFFFF; strokeWidth = d }

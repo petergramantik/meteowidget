@@ -111,7 +111,7 @@ object TvMorning {
         if ((rain >= mp.rainMm || prob >= mp.rainPct) && rain - snow * 0.7 > 0.05) {
             val wettest = hours.maxByOrNull { it.precip }?.takeIf { it.precip > 0 }
             out += MorningWarn("${pre}déšť ${n1(rain)} mm".replaceFirstChar { it.uppercase() },
-                "pravděpodobnost $prob %" + (wettest?.let { " · nejvíc kolem ${hh(it.time)}" } ?: ""), C.RAIN)
+                "~ $prob %" + (wettest?.let { " · nejvíc kolem ${hh(it.time)}" } ?: ""), C.RAIN)
             icons += R.drawable.warn_rain
         }
         // vítr

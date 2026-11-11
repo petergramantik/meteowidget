@@ -181,7 +181,12 @@ object TvMorning {
             val (greet, emoji) = mp.greeting(now.toLocalTime())
             if (mp.names.isBlank()) "$greet $emoji" else "$greet, ${mp.names} $emoji"
         }
-        box.addView(c.text(title, 17f, C.ACCENT, bold = true).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+        // dlouhý pozdrav se zmenší, aby se vešel celý na jeden řádek
+        box.addView(c.text(title, 17f, C.ACCENT, bold = true).apply {
+            maxLines = 1
+            ellipsize = null
+            setAutoSizeTextTypeUniformWithConfiguration(9, 17, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+        }, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, c.dp(24)))
         val subDay = forDay ?: today
         val sub = buildString {
             if (forDay == null) append(dateFmt.format(today)).append(" · ")

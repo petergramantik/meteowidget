@@ -171,7 +171,7 @@ object TvMorning {
         val dayF = f?.days?.firstOrNull { it.date == day }
 
         val box = c.vbox().apply {
-            background = rounded(0xFF12171D.toInt(), c.dp(10).toFloat(), c.dp(1), 0x55FFD54F)
+            background = rounded(C.CARD, c.dp(10).toFloat(), c.dp(1), C.LINE) // stejně jako ostatní panely
             setPadding(c.dp(12), c.dp(7), c.dp(12), c.dp(7))
         }
         val dateFmt = java.time.format.DateTimeFormatter.ofPattern("EEEE d. MMMM", cz)

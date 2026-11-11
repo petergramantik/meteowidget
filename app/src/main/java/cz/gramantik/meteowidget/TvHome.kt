@@ -95,6 +95,12 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         return g
     }
 
+    /** číslo se znaménkem (+ / −) a daným počtem desetinných míst */
+    private fun sgn(v: Double, decimals: Int): String {
+        val txt = String.format(cz, "%." + decimals + "f", kotlin.math.abs(v))
+        return (if (v < 0) "−" else "+") + txt
+    }
+
     /** tenká svislá dělicí linka mezi sloupci předpovědi */
     private fun sep() = View(ctx).apply { setBackgroundColor(0x1FFFFFFF) }
 
@@ -129,7 +135,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         val tiles = listOf(
             Triple("POCITOVĚ", "${deg(d.feelsMax)} / ${deg(d.feelsMin)}", C.FEELS) to "",
             Triple("VÍTR", "${d.windMax.roundToInt()} km/h", C.WIND) to "nárazy ${d.gustMax.roundToInt()} · ${ForecastFull.windDir(d.dir)}",
-            Triple("SRÁŽKY", "${f1(d.precip)} mm", C.RAIN) to ("${d.prob.coerceAtLeast(0)} %" + if (d.snow >= 0.1) " · sníh ${f1(d.snow)} cm" else ""),
+            Triple("SRÁŽKY", "${f1(d.precip)} mm", C.RAIN) to ("~ ${d.prob.coerceAtLeast(0)} %" + if (d.snow >= 0.1) " · sníh ${f1(d.snow)} cm" else ""),
             Triple("UV MAX", f1(d.uvMax), C.UV) to "",
             Triple("SLUNEČNÍ SVIT", "${f1(d.sunshineH)} h", C.ACCENT) to "",
             Triple("VÝCHOD / ZÁPAD", "${d.sunrise?.let { tf.format(it) } ?: "--"} – ${d.sunset?.let { tf.format(it) } ?: "--"}", C.LIGHT) to "",
@@ -162,18 +168,16 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         val cmp = ArrayList<String>()
         if (td != null) {
             val dt = (d.tMax - td.tMax).roundToInt()
-            if (dt >= 1) cmp += "O $dt° tepleji než dnes" else if (dt <= -1) cmp += "O ${-dt}° chladněji než dnes"
+            if (dt >= 1 || dt <= -1) cmp += "Max. teplota ${sgn(dt.toDouble(), 0)}° oproti dnešku"
             when {
-                d.precip >= 0.5 && d.precip > td.precip + 0.5 -> cmp += "Víc srážek než dnes (${f1(d.precip)} mm)"
+                d.precip >= 0.5 && d.precip > td.precip + 0.5 -> cmp += "Srážky ${sgn(d.precip - td.precip, 1)} mm oproti dnešku"
                 d.precip < 0.1 && td.precip >= 0.5 -> cmp += "Zítra bez srážek"
-                td.precip >= 0.5 && d.precip < td.precip - 0.5 -> cmp += "Méně srážek než dnes (${f1(d.precip)} mm)"
+                td.precip >= 0.5 && d.precip < td.precip - 0.5 -> cmp += "Srážky ${sgn(d.precip - td.precip, 1)} mm oproti dnešku"
             }
             val dg = d.gustMax - td.gustMax
-            if (dg >= 10) cmp += "Silnější vítr – nárazy až ${d.gustMax.roundToInt()} km/h"
-            else if (dg <= -10) cmp += "Slabší vítr – nárazy do ${d.gustMax.roundToInt()} km/h"
+            if (dg >= 10 || dg <= -10) cmp += "Nárazy větru ${sgn(dg, 0)} km/h oproti dnešku"
             val ds = d.sunshineH - td.sunshineH
-            if (ds >= 2) cmp += "Víc slunce – ${f1(d.sunshineH)} h svitu (dnes ${f1(td.sunshineH)} h)"
-            else if (ds <= -2) cmp += "Méně slunce – ${f1(d.sunshineH)} h svitu (dnes ${f1(td.sunshineH)} h)"
+            if (ds >= 2 || ds <= -2) cmp += "Slunce ${sgn(ds, 1)} h oproti dnešku"
             if (cmp.isEmpty()) cmp += "Podobné počasí jako dnes"
         }
         if (cmp.isNotEmpty()) mid.addView(FadeCycler(c, cmp).apply {
@@ -310,7 +314,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             Triple("VÍTR", "${f1(w?.windAvg)} km/h", C.WIND) to ("nárazy ${f1(w?.windGust)}" + (todayF?.let { " · až ${it.gustMax.roundToInt()}" } ?: "")),
             Triple("SRÁŽKY DNES", "${f1(w?.rainDay)} mm", C.RAIN) to (w?.rainRate?.takeIf { it > 0 }?.let { "prší ${f1(it)} mm/h" }
                 ?: todayF?.let { "~ ${f1(it.precip)} mm · ${it.prob.coerceAtLeast(0)} %" } ?: "neprší"),
-            Triple("TLAK", (w?.pressure?.let { String.format(cz, "%.0f", it) } ?: "--") + " hPa$arrow", C.BARO) to (trend?.let { "za 3 h " + String.format(cz, "%+.1f", it) } ?: ""),
+            Triple("TLAK", (w?.pressure?.let { String.format(cz, "%.0f", it) } ?: "--") + " hPa$arrow", C.BARO) to (trend?.let { "za 3 h: " + String.format(cz, "%+.1f", it).replace("-", "−") } ?: ""),
             Triple("UV", f1(w?.uv), C.UV) to (todayF?.let { "max ${f1(it.uvMax)} · svit ${f1(it.sunshineH)} h" } ?: ""),
             Triple("VENKU DNES", if (mn != null && mx != null) "${f1(mn.second)}° / ${f1(mx.second)}°" else "--", C.OUT) to
                 (if (mn != null && mx != null) "↓ ${hm.format(Date(mn.first))} · ↑ ${hm.format(Date(mx.first))}" else ""),

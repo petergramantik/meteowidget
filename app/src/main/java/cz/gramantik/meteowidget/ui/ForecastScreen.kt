@@ -12,6 +12,7 @@ import cz.gramantik.meteowidget.FullForecast
 import cz.gramantik.meteowidget.HourF
 import cz.gramantik.meteowidget.MainActivity
 import cz.gramantik.meteowidget.MeteoDb
+import cz.gramantik.meteowidget.MorningPrefs
 import cz.gramantik.meteowidget.Prefs
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -48,6 +49,8 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
     }
 
     override fun refresh() {
+        // zapamatovat prvek s focusem (podle tagu) – po překreslení ho vrátit
+        val focusTag = (view as? android.view.ViewGroup)?.findFocus()?.tag
         content.removeAllViews()
         dayHeaders.clear()
         val f = ForecastFull.load(a)
@@ -56,11 +59,11 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             return
         }
         now(f)
-        val chips = Mode.entries.map { m -> a.chip(m.label, m == mode) { mode = m; refresh() } }
+        val chips = Mode.entries.map { m -> a.chip(m.label, m == mode) { mode = m; refresh() }.apply { tag = "mode_${m.name}" } }
         content.addView(a.chipRow(*chips.toTypedArray()), a.lp(top = 4, bottom = 10))
         when (mode) {
             Mode.H48 -> hours(f, 48, list = false)
-            Mode.D3 -> hours(f, 72, list = true)
+            Mode.D3 -> if (a.isTv()) days3Tv(f) else hours(f, 72, list = true)
             Mode.D16 -> days(f)
         }
         accuracy()
@@ -82,6 +85,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             a.text("Předpověď: Open-Meteo.com (CC BY 4.0) · ${Prefs(a).locName}", 11f, C.DIM),
             a.lp(top = 8)
         )
+        if (focusTag != null) content.findViewWithTag<View>(focusTag)?.let { v -> v.post { v.requestFocus() } }
     }
 
     private fun upcoming(f: FullForecast): List<HourF> {
@@ -142,20 +146,29 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         if (!list) {
             // vodorovný pás hodin
             val row = a.hbox(Gravity.TOP)
+            val tvc = a.isTv() // TV: co nejmenší buňky, aby byl vidět celý graf
+            val ic = if (tvc) 26 else 40
+            val small = if (tvc) 9.5f else 11f
             for (h in hs) {
                 val cell = a.vbox(Gravity.CENTER_HORIZONTAL).apply {
-                    background = rounded(C.CARD2, a.dp(12).toFloat())
-                    setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(8))
+                    background = rounded(C.CARD2, a.dp(if (tvc) 8 else 12).toFloat())
+                    if (tvc) setPadding(a.dp(2), a.dp(3), a.dp(2), a.dp(3)) else setPadding(a.dp(8), a.dp(8), a.dp(8), a.dp(8))
                 }
                 val hourLabel = if (h.time.hour == 0) h.time.format(DateTimeFormatter.ofPattern("d.M.")) else "${h.time.hour}:00"
-                cell.addView(a.text(hourLabel, 12f, if (h.time.hour == 0) C.ACCENT else C.LABEL, bold = h.time.hour == 0))
-                cell.addView(a.icon(h.icon, 40), a.lp(a.dp(40), a.dp(40), top = 4))
-                cell.addView(a.text(deg(h.temp), 17f, C.WHITE, condensed = true), a.lp(WRAP, WRAP, top = 2))
-                cell.addView(a.text(if (h.precip >= 0.1) "${f1(h.precip)} mm" else " ", 11f, C.RAIN), a.lp(WRAP, WRAP, top = 2))
-                cell.addView(a.text(if (h.prob >= 0) "${h.prob} %" else " ", 11f, C.RAIN))
-                cell.addView(a.text("${h.wind.roundToInt()} km/h", 11f, C.WIND), a.lp(WRAP, WRAP, top = 2))
-                cell.addView(a.text(if (h.storm > 0) "⚡" else " ", 12f, C.ACCENT))
-                row.addView(cell, a.lp(a.dp(70), WRAP, end = 6))
+                cell.addView(a.text(hourLabel, if (tvc) 10f else 12f, if (h.time.hour == 0) C.ACCENT else C.LABEL, bold = h.time.hour == 0), a.lp(WRAP, WRAP))
+                cell.addView(a.icon(h.icon, ic), a.lp(a.dp(ic), a.dp(ic), top = if (tvc) 1 else 4))
+                cell.addView(a.text(deg(h.temp), if (tvc) 14f else 17f, C.WHITE, condensed = true), a.lp(WRAP, WRAP, top = if (tvc) 0 else 2))
+                if (tvc) {
+                    // srážky a pravděpodobnost v jednom řádku, bouřka za větrem
+                    cell.addView(a.text(if (h.precip >= 0.1) "${f1(h.precip)}" else if (h.prob > 0) "${h.prob}%" else " ", small, C.RAIN), a.lp(WRAP, WRAP))
+                    cell.addView(a.text("${h.wind.roundToInt()}" + if (h.storm > 0) "⚡" else "", small, if (h.storm > 0) C.ACCENT else C.WIND), a.lp(WRAP, WRAP))
+                } else {
+                    cell.addView(a.text(if (h.precip >= 0.1) "${f1(h.precip)} mm" else " ", small, C.RAIN), a.lp(WRAP, WRAP, top = 2))
+                    cell.addView(a.text(if (h.prob >= 0) "${h.prob} %" else " ", small, C.RAIN))
+                    cell.addView(a.text("${h.wind.roundToInt()} km/h", small, C.WIND), a.lp(WRAP, WRAP, top = 2))
+                    cell.addView(a.text(if (h.storm > 0) "⚡" else " ", 12f, C.ACCENT))
+                }
+                row.addView(cell, a.lp(a.dp(if (tvc) 42 else 70), WRAP, end = if (tvc) 3 else 6))
             }
             val hsv = HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(row) }
             fun arrow(t: String, dir: Int) = a.text(t, 26f, C.ACCENT, bold = true).apply {
@@ -178,6 +191,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             wrap.addView(hsv, a.lp(0, WRAP, 1f))
             wrap.addView(right, a.lp(WRAP, WRAP))
             c.addView(wrap)
+            if (tvc) c.addView(a.text("srážky mm (nebo pravděpodobnost) · vítr km/h", 9f, C.DIM), a.lp(top = 2))
         } else {
             var lastDay: LocalDate? = null
             for (h in hs) {
@@ -208,7 +222,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
                 Series("Pocitově", C.FEELS, times, hs.map { it.feels }.toDoubleArray(), unit = "°C"),
                 Series("Srážky", C.RAIN, times, hs.map { it.precip }.toDoubleArray(), bars = true, unit = "mm", ownAxis = true),
             )
-        }, a.lp(h = a.dp(210), top = 12))
+        }, a.lp(h = a.dp(if (a.isTv()) 170 else 210), top = if (a.isTv()) 6 else 12))
         c.addView(a.text("● teplota  ● pocitově  ▮ srážky (mm, pravá osa)", 11f, C.DIM), a.lp(top = 4))
         content.addView(c, a.lp(bottom = 10))
     }
@@ -217,8 +231,9 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
     private fun days(f: FullForecast) {
         val ds = f.days.filter { !it.date.isBefore(LocalDate.now()) }
         if (ds.isEmpty()) return
-        val c = a.card("${ds.size} dní")
-        if (!a.isTv()) c.addView(a.text("Klepni na den pro podrobnosti", 11f, C.DIM), a.lp(bottom = 6))
+        val c = if (a.isTv()) a.card() else a.card("${ds.size} dní")
+        if (a.isTv()) c.addView(legendRow("${ds.size} dní"), a.lp(bottom = 4))
+        else c.addView(a.text("Klepni na den pro podrobnosti", 11f, C.DIM), a.lp(bottom = 6))
         val tf = DateTimeFormatter.ofPattern("HH:mm")
         val hourDays = f.hours.map { it.time.toLocalDate() }.toSet()
         val tv = a.isTv()
@@ -303,13 +318,57 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
     }
 
     /** TV: kompaktní řádek dne se srážkovým páskem. */
-    private fun tvDayRow(f: FullForecast, d: DayF, jump: Boolean): View {
+    /** Nadpis karty s legendou 🌙 ☀ 🌙 nad srážkovým páskem (TV). Šířky odpovídají řádku dne. */
+    private fun legendRow(title: String): View {
+        val r = a.hbox(Gravity.CENTER_VERTICAL).apply { setPadding(a.dp(10), 0, a.dp(10), 0) }
+        r.addView(a.label(title.uppercase(cz)), a.lp(a.dp(62 + 30 + 126), WRAP))
+        val leg = a.hbox(Gravity.CENTER_VERTICAL)
+        listOf("🌙 noc" to 7f, "☀ den" to 10f, "🌙 noc" to 7f).forEach { (t, w) ->
+            leg.addView(a.text(t, 10f, C.DIM).apply { gravity = Gravity.CENTER }, a.lp(0, WRAP, w))
+        }
+        r.addView(leg, a.lp(0, WRAP, 1f, start = 8, end = 8))
+        r.addView(View(a), a.lp(a.dp(38 + 34 + 20), 1))
+        return r
+    }
+
+    /** TV: 3 dny ve formátu řádků se srážkovým páskem a větrem po 2 hodinách. */
+    private fun days3Tv(f: FullForecast) {
+        val ds = f.days.filter { !it.date.isBefore(LocalDate.now()) }.take(3)
+        if (ds.isEmpty()) return
+        val c = a.card()
+        c.addView(legendRow("3 dny"), a.lp(bottom = 4))
+        val hourDays = f.hours.map { it.time.toLocalDate() }.toSet()
+        for (d in ds) {
+            c.addView(tvDayRow(f, d, jump = false, withWind = true), a.lp(bottom = 4))
+            if (d.date in expanded3 && d.date in hourDays) {
+                // rozbalený hodinový přehled dne
+                f.hours.filter { it.time.toLocalDate() == d.date }.forEach { h ->
+                    val r = a.hbox()
+                    r.addView(a.text(String.format("%02d:00", h.time.hour), 12f, C.LABEL, condensed = true), a.lp(a.dp(44), WRAP, start = 10))
+                    r.addView(a.icon(h.icon, 24), a.lp(a.dp(24), a.dp(24)))
+                    r.addView(a.text(deg(h.temp), 14f, C.WHITE, condensed = true), a.lp(a.dp(40), WRAP, start = 6))
+                    r.addView(a.text(if (h.precip >= 0.1) "${f1(h.precip)} mm" else "", 11f, C.RAIN), a.lp(a.dp(52), WRAP))
+                    r.addView(a.text(if (h.prob > 0) "${h.prob} %" else "", 11f, C.RAIN), a.lp(a.dp(38), WRAP))
+                    r.addView(a.text("${h.wind.roundToInt()}/${h.gust.roundToInt()} km/h ${ForecastFull.windDir(h.dir)}", 11f, C.WIND, condensed = true), a.lp(0, WRAP, 1f))
+                    r.addView(a.text(if (h.storm > 0) "⚡" else "", 11f, C.ACCENT))
+                    c.addView(r, a.lp(bottom = 1))
+                }
+            }
+        }
+        c.addView(a.text("pod kapkami vítr km/h a směr · OK na dni rozbalí hodiny", 9f, C.DIM), a.lp(top = 2))
+        content.addView(c, a.lp(bottom = 10))
+    }
+
+    private val expanded3 = HashSet<LocalDate>()
+
+    private fun tvDayRow(f: FullForecast, d: DayF, jump: Boolean, withWind: Boolean = false): View {
         val box = a.hbox().apply {
             background = if (jump) rounded(0xFF1D2630.toInt(), a.dp(10).toFloat(), a.dp(1), 0x66FFD54F)
             else rounded(C.CARD2, a.dp(10).toFloat())
             setPadding(a.dp(10), a.dp(3), a.dp(10), a.dp(3))
             isClickable = true
             isFocusable = true
+            tag = (if (withWind) "d3_" else "day_") + d.date
         }
         box.addView(a.vbox().apply {
             addView(a.text(dayName(d.date), 13f, C.WHITE, bold = true).apply { maxLines = 1 })
@@ -335,13 +394,28 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             if (d.date == LocalDate.now()) strip.pastBefore = LocalDateTime.now().hour / 2
             d.sunrise?.let { strip.sunrise = it.hour + it.minute / 60.0 }
             d.sunset?.let { strip.sunset = it.hour + it.minute / 60.0 }
+            if (withWind) {
+                val wa = DoubleArray(12) { Double.NaN }
+                val wd = DoubleArray(12) { Double.NaN }
+                hrs.groupBy { it.time.hour / 2 }.forEach { (slot, list) ->
+                    wa[slot] = list.maxOf { it.wind }
+                    wd[slot] = list.first().dir.toDouble()
+                }
+                strip.wind = wa
+                strip.windDir = wd
+                strip.strongWind = MorningPrefs(a).windFrom.toDouble()
+            }
         }
-        box.addView(strip, a.lp(0, a.dp(30), 1f, start = 8, end = 8))
+        box.addView(strip, a.lp(0, a.dp(if (withWind) 44 else 30), 1f, start = 8, end = 8))
         box.addView(a.text(deg(d.tMax), 16f, C.IN, condensed = true).apply { gravity = Gravity.END }, a.lp(a.dp(38), WRAP))
         box.addView(a.text(deg(d.tMin), 14f, 0xFF8FB3FF.toInt(), condensed = true).apply { gravity = Gravity.END }, a.lp(a.dp(34), WRAP))
         box.addView(a.text(if (jump) "›" else " ", 20f, C.ACCENT, bold = true), a.lp(a.dp(14), WRAP, start = 6))
         box.setOnClickListener {
-            if (jump) { mode = Mode.D3; scrollTo = d.date } else expanded.add(d.date)
+            when {
+                withWind -> if (!expanded3.add(d.date)) expanded3.remove(d.date)
+                jump -> { mode = Mode.D3; scrollTo = d.date; expanded3.add(d.date) }
+                else -> expanded.add(d.date)
+            }
             refresh()
         }
         box.tvFocus(if (jump) 0x66FFD54F else 0, 1.0f)

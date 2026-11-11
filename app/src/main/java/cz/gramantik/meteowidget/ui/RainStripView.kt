@@ -22,6 +22,12 @@ class RainStripView(ctx: Context) : View(ctx) {
     var sunrise = Double.NaN
     var sunset = Double.NaN
     private val night = Paint().apply { color = 0x332A4A8C; style = Paint.Style.FILL }
+    /** vítr v dílku (km/h, NaN = nezobrazovat) a směr (stupně, odkud fouká); silný = zvýraznit */
+    var wind: DoubleArray? = null
+    var windDir = DoubleArray(12) { Double.NaN }
+    var strongWind = 50.0
+    private val windTxt = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 9f * d; textAlign = Paint.Align.CENTER; isFakeBoldText = true }
+    private val arrowP = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.3f * d; strokeCap = Paint.Cap.ROUND }
 
     private val d = ctx.resources.displayMetrics.density
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x24FFFFFF; strokeWidth = d }
@@ -34,8 +40,9 @@ class RainStripView(ctx: Context) : View(ctx) {
 
     override fun onDraw(c: Canvas) {
         val labelH = 10 * d
+        val windH = if (wind != null) 13 * d else 0f
         val w = width.toFloat()
-        val h = height - labelH
+        val h = height - labelH - windH
         val cw = w / 12f
         // noc jemně tmavomodře (podle východu a západu slunce)
         if (!sunrise.isNaN() && !sunset.isNaN()) {
@@ -59,6 +66,32 @@ class RainStripView(ctx: Context) : View(ctx) {
                 val cx = i * cw + cw / 2 + (k - (n - 1) / 2f) * s * 2.3f
                 val asFlake = isSnow || (mixed && k == n - 1)
                 if (asFlake) drawFlake(c, cx, cy, s, alpha) else drawDrop(c, cx, cy, s, alpha)
+            }
+        }
+        // vítr pod kapkami: rychlost + šipka směru
+        wind?.let { wa ->
+            val y = h + windH - 3 * d
+            for (i in 0 until 12) {
+                val v = wa.getOrNull(i) ?: continue
+                if (v.isNaN()) continue
+                val strong = v >= strongWind
+                val col = if (strong) 0xFFFFB74D.toInt() else 0xFF9FD4FF.toInt()
+                windTxt.color = col
+                arrowP.color = col
+                val cx = i * cw + cw / 2
+                val dir = windDir[i]
+                val txt = Math.round(v).toString()
+                if (!dir.isNaN() && cw > 22 * d) {
+                    c.drawText(txt, cx - 4 * d, y, windTxt)
+                    // šipka po větru (kam fouká)
+                    val ang = Math.toRadians(dir + 180.0)
+                    val ax = cx + windTxt.measureText(txt) / 2 + 2 * d
+                    val ay = y - 3.5f * d
+                    val dx = (sin(ang) * 3.5 * d).toFloat()
+                    val dy = (-cos(ang) * 3.5 * d).toFloat()
+                    c.drawLine(ax - dx, ay - dy, ax + dx, ay + dy, arrowP)
+                    c.drawCircle(ax + dx, ay + dy, 1.2f * d, arrowP)
+                } else c.drawText(txt, cx, y, windTxt)
             }
         }
         for (hh in listOf(0, 6, 12, 18)) c.drawText(hh.toString(), (hh / 2) * cw + (if (hh == 0) 4 * d else 0f), height - 1 * d, label)

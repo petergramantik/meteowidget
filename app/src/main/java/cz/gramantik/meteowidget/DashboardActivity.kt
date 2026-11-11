@@ -258,6 +258,18 @@ class DashboardActivity : Activity() {
         return bottom - top > minOf(a.height, b.height) / 2
     }
 
+    /** Rolovací obal karty, ve kterém je daný prvek (nebo hlavní obal karty). */
+    private fun scrollerOf(v: View?): android.widget.ScrollView? {
+        var p: Any? = v
+        while (p is View && p !== cardHost) { if (p is android.widget.ScrollView) return p; p = p.parent }
+        return cardHost.getChildAt(0) as? android.widget.ScrollView
+    }
+
+    private fun isVisibleOnScreen(v: View): Boolean {
+        val r = android.graphics.Rect()
+        return v.getGlobalVisibleRect(r) && r.height() >= v.height / 2
+    }
+
     private fun isInCard(v: View?): Boolean {
         var p: Any? = v
         while (p is View) { if (p === cardHost) return true; p = p.parent }
@@ -272,13 +284,30 @@ class DashboardActivity : Activity() {
         val tabs = panel.home.tabViews
         val inContent = cardHost.visibility == View.VISIBLE && cardHost.hasFocus()
         val f = currentFocus
+        // Zpět z jakékoli karty -> karta Dnes
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && panel.home.activeTab != TvHome.TAB_TODAY) {
+            panel.focusedTab = TvHome.TAB_TODAY
+            showCard(TvHome.TAB_TODAY)
+            tabs.getOrNull(TvHome.TAB_TODAY)?.requestFocus()
+            return true
+        }
         if (inContent) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_BACK -> { focusTabs(); return true }
-                KeyEvent.KEYCODE_DPAD_UP -> {
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (f is android.webkit.WebView) return super.dispatchKeyEvent(event)
-                    val next = f?.focusSearch(View.FOCUS_UP)
-                    if (next == null || !isInCard(next)) { focusTabs(); return true }
+                    val up = event.keyCode == KeyEvent.KEYCODE_DPAD_UP
+                    val next = f?.focusSearch(if (up) View.FOCUS_UP else View.FOCUS_DOWN)
+                    // další prvek je vidět ve stejné kartě -> normální přesun focusu
+                    if (next != null && isInCard(next) && isVisibleOnScreen(next)) return super.dispatchKeyEvent(event)
+                    // jinak rolovat kartou; do menu až z úplného vrcholu
+                    val sv = scrollerOf(f)
+                    if (sv != null && sv.canScrollVertically(if (up) -1 else 1)) {
+                        sv.smoothScrollBy(0, (if (up) -1 else 1) * sv.height / 3)
+                        return true
+                    }
+                    if (up) { focusTabs(); return true }
+                    if (next != null && isInCard(next)) return super.dispatchKeyEvent(event)
+                    return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     if (f is android.webkit.WebView || f is android.widget.SeekBar) return super.dispatchKeyEvent(event)
@@ -302,6 +331,8 @@ class DashboardActivity : Activity() {
                 return true
             }
             KeyEvent.KEYCODE_DPAD_UP -> {
+                // jas jen na kartách Dnes a Zítra
+                if (cardHost.visibility == View.VISIBLE) return true
                 val b = panel.changeBrightness(5)
                 show((if (panel.isNight) "Noční jas" else "Jas") + ": $b %")
                 return true

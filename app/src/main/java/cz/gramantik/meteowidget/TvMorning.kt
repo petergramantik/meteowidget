@@ -131,7 +131,7 @@ object TvMorning {
     fun targetDay(now: LocalDateTime = LocalDateTime.now()): LocalDate =
         if (now.hour >= 18) now.toLocalDate().plusDays(1) else now.toLocalDate()
 
-    data class Result(val warns: List<MorningWarn>, val icons: List<Int>)
+    data class Result(val warns: List<MorningWarn>, val icons: List<Int>, val pulse: Set<Int> = emptySet())
 
     fun warnings(ctx: Context, day: LocalDate): Result {
         val mp = MorningPrefs(ctx)
@@ -201,7 +201,18 @@ object TvMorning {
                 "mrznoucí déšť – opatrně na chodnících i silnici", 0xFFFFD54F.toInt()))
             icons += R.drawable.warn_ice
         }
-        return Result(out, icons.toList())
+        // ikonky odpovídající výstraze ČHMÚ pomalu pulzují (a ukážou se, i kdyby je předpověď nehlásila)
+        val pulse = HashSet<Int>()
+        alerts.forEach { al ->
+            val e = (al.event + " " + al.description).lowercase(cz)
+            if ("vítr" in e || "větr" in e || "vichřic" in e) pulse += R.drawable.warn_wind
+            if ("náledí" in e || "ledovk" in e) pulse += R.drawable.warn_ice
+            if ("sníh" in e || "sněh" in e || "sněž" in e || "závěj" in e) pulse += R.drawable.warn_snow
+            if ("mráz" in e || "nízk" in e && "teplot" in e) pulse += R.drawable.warn_frost
+            if ("déšť" in e || "dešť" in e || "srážk" in e || "povod" in e) pulse += R.drawable.warn_rain
+        }
+        icons += pulse
+        return Result(out, icons.toList(), pulse)
     }
 
     /**
@@ -285,7 +296,22 @@ object TvMorning {
         if (res.icons.isNotEmpty()) {
             val ir = c.hbox()
             res.icons.forEach { id ->
-                ir.addView(ImageView(c).apply { setImageResource(id) }, c.lp(c.dp(26), c.dp(26), end = 6))
+                val iv = ImageView(c).apply { setImageResource(id) }
+                if (id in res.pulse) {
+                    // pomalé pulzování – výstraha ČHMÚ
+                    android.animation.ObjectAnimator.ofPropertyValuesHolder(iv,
+                        android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.25f),
+                        android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.25f),
+                        android.animation.PropertyValuesHolder.ofFloat(View.ALPHA, 1f, 0.55f),
+                    ).apply {
+                        duration = 1100
+                        repeatCount = android.animation.ValueAnimator.INFINITE
+                        repeatMode = android.animation.ValueAnimator.REVERSE
+                        interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+                        start()
+                    }
+                }
+                ir.addView(iv, c.lp(c.dp(26), c.dp(26), end = 8))
             }
             warnCol.addView(ir, c.lp(top = 2))
         }

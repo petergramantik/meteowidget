@@ -33,7 +33,7 @@ import kotlin.math.roundToInt
 class TvHome(private val ctx: Context, private val interactive: Boolean) {
 
     companion object {
-        val TABS = listOf("Dnes", "Zítra", "Předpověď", "Radar", "Historie", "⚙ Nastavení", "🔔")
+        val TABS = listOf("Dnes", "Zítra", "Předpověď", "Radar", "Doma", "⚙ Nastavení", "🔔")
         const val TAB_TODAY = 0
         const val TAB_TOMORROW = 1
         const val TAB_FORECAST = 2

@@ -335,8 +335,8 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             if (d.date == LocalDate.now()) strip.pastBefore = LocalDateTime.now().hour / 2
         }
         box.addView(strip, a.lp(0, a.dp(30), 1f, start = 8, end = 8))
-        box.addView(a.text(deg(d.tMax), 16f, C.IN, condensed = true), a.lp(WRAP, WRAP, end = 6))
-        box.addView(a.text(deg(d.tMin), 14f, 0xFF8FB3FF.toInt(), condensed = true))
+        box.addView(a.text(deg(d.tMax), 16f, C.IN, condensed = true).apply { gravity = Gravity.END }, a.lp(a.dp(38), WRAP))
+        box.addView(a.text(deg(d.tMin), 14f, 0xFF8FB3FF.toInt(), condensed = true).apply { gravity = Gravity.END }, a.lp(a.dp(34), WRAP))
         box.addView(a.text(if (jump) "›" else " ", 20f, C.ACCENT, bold = true), a.lp(a.dp(14), WRAP, start = 6))
         box.setOnClickListener {
             if (jump) { mode = Mode.D3; scrollTo = d.date } else expanded.add(d.date)

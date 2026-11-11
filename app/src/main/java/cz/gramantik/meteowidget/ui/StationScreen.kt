@@ -63,6 +63,26 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
     private fun time(ms: Long) = SimpleDateFormat("HH:mm", cz).format(Date(ms))
     private fun dateTime(ms: Long) = SimpleDateFormat("d.M.yyyy HH:mm", cz).format(Date(ms))
 
+    /** TV karta Doma: výstraha na vlhkost vnitřních čidel mimo komfortní zónu. */
+    private fun humidityWarnings(p: Prefs, w: Weather) {
+        val n = NotifyPrefs(a)
+        val list = ArrayList<Pair<String, Int>>()
+        val chans = listOf(Channel.IN to true, Channel.S1 to n.indoor(1), Channel.S2 to n.indoor(2), Channel.S3 to n.indoor(3))
+        for ((ch, indoor) in chans) {
+            if (!indoor) continue
+            val h = w.hum(ch.humCode) ?: continue
+            val name = p.channelName(ch)
+            when {
+                h < n.humMin -> list += "💧 Nízká vlhkost – $name: $h % (komfort ${n.humMin.toInt()}–${n.humMax.toInt()} %) – zvlhči vzduch" to 0xFFFFB74D.toInt()
+                h > n.humMax -> list += "💦 Vysoká vlhkost – $name: $h % (komfort ${n.humMin.toInt()}–${n.humMax.toInt()} %) – vyvětrej" to C.RAIN
+            }
+        }
+        if (list.isEmpty()) return
+        val c = a.card("Vlhkost mimo komfortní zónu", 0xFFFFB74D.toInt())
+        list.forEach { (t, col) -> c.addView(a.text(t, 14f, col, bold = true), a.lp(top = 4)) }
+        content.addView(c, a.lp(bottom = 10))
+    }
+
     override fun refresh() {
         content.removeAllViews()
         val p = Prefs(a)
@@ -80,6 +100,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         }
         content.addView(a.text(status, 12f, statusColor), a.lp(bottom = 8))
 
+        if (w != null && a.isTv()) humidityWarnings(p, w)
         alerts()
         if (w != null) {
             current(p, w)

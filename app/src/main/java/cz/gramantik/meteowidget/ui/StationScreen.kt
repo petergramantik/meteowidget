@@ -57,6 +57,10 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
     private var dayTo: LocalDate = LocalDate.now()
     private var historyBox: LinearLayout? = null
 
+    /** otevřený graf čidla a TV prvky čidel – musí existovat dřív, než se poprvé vykreslí */
+    private var openChannel: Channel? = null
+    private val tvItems = HashMap<Channel, View>()
+
     init { refresh() }
 
     private fun f1(v: Double?) = if (v == null) "--" else String.format(cz, "%.1f", v)
@@ -141,7 +145,6 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
 
     // ---------- aktuální hodnoty ----------
     // rozbalený graf čidla z prvního panelu
-    private var openChannel: Channel? = null
     private var openDays = 1
 
     private fun toggleChannel(ch: Channel) {
@@ -151,8 +154,7 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         if (a.isTv()) tvItems[ch]?.let { v -> v.post { v.requestFocus() } }
     }
 
-    /** TV: prvky čidel v řádku (pro návrat focusu po překreslení) */
-    private val tvItems = HashMap<Channel, View>()
+
 
     /** TV: Doma, Venku a čidla v jednom řádku. */
     private fun currentTv(p: Prefs, w: Weather) {

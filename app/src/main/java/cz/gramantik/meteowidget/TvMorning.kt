@@ -241,13 +241,9 @@ object TvMorning {
             val card = c.vbox().apply {
                 background = rounded(0xFF0C0F13.toInt(), c.dp(6).toFloat(), c.dp(1), (w.color and 0x00FFFFFF) or 0x88000000.toInt())
                 setPadding(c.dp(6), c.dp(3), c.dp(6), c.dp(3))
-                // dlouhý text roluje do strany
-                fun TextView.marquee() = apply {
-                    setSingleLine(); ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
-                    marqueeRepeatLimit = -1; isSelected = true
-                }
-                addView(c.text(w.title, 10.5f, w.color, bold = true).marquee())
-                if (w.sub.isNotEmpty()) addView(c.text(w.sub, 8.5f, C.DIM).marquee())
+                // dlouhý text roluje tam a zpět
+                addView(c.text(w.title, 10.5f, w.color, bold = true).bounce(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
+                if (w.sub.isNotEmpty()) addView(c.text(w.sub, 8.5f, C.DIM).bounce(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
             }
             wl.addView(card, c.lp(bottom = 3))
         }
@@ -364,4 +360,45 @@ class FadeCycler(ctx: Context, private val items: List<String>) : TextView(ctx) 
         animate().cancel()
         super.onDetachedFromWindow()
     }
+}
+
+
+/**
+ * Text, který se nevejde, pomalu roluje tam a zpět (s pauzou na obou koncích). Kratší stojí.
+ * Poloha se počítá z času, takže překreslení panelu plynule navazuje.
+ */
+fun TextView.bounce(): TextView {
+    setSingleLine()
+    ellipsize = null
+    setHorizontallyScrolling(true)
+    val speed = 22f * resources.displayMetrics.density // px/s
+    val hold = 1500L
+    val step = object : Runnable {
+        override fun run() {
+            if (!isAttachedToWindow) return
+            val l = layout
+            val over = if (l == null) 0f else l.getLineWidth(0) - (width - totalPaddingLeft - totalPaddingRight)
+            if (over > 1f) {
+                val travel = (over / speed * 1000).toLong().coerceAtLeast(400)
+                val period = 2 * (travel + hold)
+                val ph = System.currentTimeMillis() % period
+                val x = when {
+                    ph < hold -> 0f
+                    ph < hold + travel -> (ph - hold).toFloat() / travel * over
+                    ph < 2 * hold + travel -> over
+                    else -> (1 - (ph - 2 * hold - travel).toFloat() / travel) * over
+                }
+                scrollTo(x.toInt(), 0)
+                postDelayed(this, 40)
+            } else {
+                if (scrollX != 0) scrollTo(0, 0)
+                postDelayed(this, 1000)
+            }
+        }
+    }
+    addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(v: View) { removeCallbacks(step); post(step) }
+        override fun onViewDetachedFromWindow(v: View) { removeCallbacks(step) }
+    })
+    return this
 }

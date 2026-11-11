@@ -71,12 +71,24 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         setPadding(ctx.dp(10), ctx.dp(7), ctx.dp(10), ctx.dp(7))
     }
 
-    /** text, který se nevejde, pomalu roluje do strany (kratší stojí) */
-    private fun TextView.marquee() = apply {
-        setSingleLine()
-        ellipsize = android.text.TextUtils.TruncateAt.MARQUEE
-        marqueeRepeatLimit = -1
-        isSelected = true
+    /** Dlaždice 3 × 2 v levém panelu – stejný vzhled na kartách Dnes i Zítra. */
+    private fun tileGrid(tiles: List<Pair<Triple<String, String, Int>, String>>): LinearLayout {
+        val c = ctx
+        val g = c.vbox()
+        tiles.chunked(3).forEachIndexed { ri, rowT ->
+            val r = c.hbox(Gravity.TOP)
+            rowT.forEachIndexed { k, (hd, sub) ->
+                r.addView(c.vbox().apply {
+                    background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
+                    setPadding(c.dp(5), c.dp(2), c.dp(5), c.dp(2))
+                    addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
+                    addView(c.text(hd.second, 12f, hd.third, condensed = true).bounce(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
+                    if (sub.isNotEmpty()) addView(c.text(sub, 7f, C.DIM).bounce(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
+                }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
+            }
+            g.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))
+        }
+        return g
     }
 
     /** tenká svislá dělicí linka mezi sloupci předpovědi */
@@ -115,23 +127,10 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             Triple("VÍTR", "${d.windMax.roundToInt()} km/h", C.WIND) to "nárazy ${d.gustMax.roundToInt()} · ${ForecastFull.windDir(d.dir)}",
             Triple("SRÁŽKY", "${f1(d.precip)} mm", C.RAIN) to ("${d.prob.coerceAtLeast(0)} %" + if (d.snow >= 0.1) " · sníh ${f1(d.snow)} cm" else ""),
             Triple("UV MAX", f1(d.uvMax), C.UV) to "",
-            Triple("SLUNCE", "${f1(d.sunshineH)} h", C.ACCENT) to "svit",
+            Triple("SLUNEČNÍ SVIT", "${f1(d.sunshineH)} h", C.ACCENT) to "",
             Triple("VÝCHOD / ZÁPAD", "${d.sunrise?.let { tf.format(it) } ?: "--"} – ${d.sunset?.let { tf.format(it) } ?: "--"}", C.LIGHT) to "",
         )
-        val grid = c.vbox()
-        tiles.chunked(3).forEachIndexed { ri, row ->
-            val r = c.hbox(Gravity.TOP)
-            row.forEachIndexed { k, (hd, sub) ->
-                r.addView(c.vbox().apply {
-                    background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
-                    setPadding(c.dp(5), c.dp(3), c.dp(4), c.dp(3))
-                    addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
-                    addView(c.text(hd.second, 13f, hd.third, condensed = true).marquee(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, top = 1))
-                    addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).marquee(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
-                }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
-            }
-            grid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))
-        }
+        val grid = tileGrid(tiles)
         // ráno · odpoledne · večer
         val f = ForecastFull.load(c)
         val tmr = LocalDate.now().plusDays(1)
@@ -174,7 +173,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             if (cmp.isEmpty()) cmp += "Podobné počasí jako dnes"
         }
         if (cmp.isNotEmpty()) mid.addView(FadeCycler(c, cmp).apply {
-            textSize = 9f; setTextColor(C.ACCENT); gravity = Gravity.CENTER
+            textSize = 8f; setTextColor(C.ACCENT); gravity = Gravity.CENTER
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, top = 3))
         left.addView(mid, c.lp(h = 0, weight = 1f))
@@ -312,20 +311,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             Triple("VENKU DNES", if (mn != null && mx != null) "${f1(mn.second)}° / ${f1(mx.second)}°" else "--", C.OUT) to
                 (if (mn != null && mx != null) "↓ ${hm.format(Date(mn.first))} · ↑ ${hm.format(Date(mx.first))}" else ""),
         )
-        val lgrid = c.vbox()
-        tiles.chunked(3).forEachIndexed { ri, rowT ->
-            val r = c.hbox(Gravity.TOP)
-            rowT.forEachIndexed { k, (hd, sub) ->
-                r.addView(c.vbox().apply {
-                    background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
-                    setPadding(c.dp(5), c.dp(2), c.dp(4), c.dp(2))
-                    addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
-                    addView(c.text(hd.second, 13f, hd.third, condensed = true).marquee(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
-                    addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).marquee(), c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP))
-                }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
-            }
-            lgrid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))
-        }
+        val lgrid = tileGrid(tiles)
         left.addView(mid, c.lp(h = 0, weight = 1f))
         left.addView(lgrid, c.lp(h = c.dp(TILES_H), top = 4))
         if (p.lastError != null) mid.addView(c.text(friendlyError(p.lastError, p.lastUpdate) ?: "", 9f, C.ACCENT), c.lp(top = 3))

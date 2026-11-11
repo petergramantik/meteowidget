@@ -368,20 +368,27 @@ class FadeCycler(ctx: Context, private val items: List<String>) : TextView(ctx) 
  * Poloha se počítá z času, takže překreslení panelu plynule navazuje.
  */
 fun TextView.bounce(): TextView {
-    setSingleLine()
+    // pozor: setSingleLine()/vodorovné rolování se zarovnáním na střed text „odsune“ mimo dlaždici,
+    // proto se rolování zapíná jen tehdy, když se text opravdu nevejde
+    maxLines = 1
     ellipsize = null
-    setHorizontallyScrolling(true)
+    setHorizontallyScrolling(false)
     val speed = 22f * resources.displayMetrics.density // px/s
     val hold = 1500L
-    val baseGravity = gravity // při rolování od začátku, jinak původní (např. na střed)
+    val baseGravity = gravity
     val scrollGravity = (gravity and android.view.Gravity.VERTICAL_GRAVITY_MASK) or android.view.Gravity.START
+    var scrolling = false
     val step = object : Runnable {
         override fun run() {
             if (!isAttachedToWindow) return
-            val l = layout
-            val over = if (l == null) 0f else l.getLineWidth(0) - (width - totalPaddingLeft - totalPaddingRight)
+            val avail = width - totalPaddingLeft - totalPaddingRight
+            val over = if (avail <= 0) 0f else paint.measureText(text.toString()) - avail
             if (over > 1f) {
-                if (gravity != scrollGravity) gravity = scrollGravity
+                if (!scrolling) {
+                    scrolling = true
+                    setHorizontallyScrolling(true)
+                    gravity = scrollGravity
+                }
                 val travel = (over / speed * 1000).toLong().coerceAtLeast(400)
                 val period = 2 * (travel + hold)
                 val ph = System.currentTimeMillis() % period
@@ -394,9 +401,13 @@ fun TextView.bounce(): TextView {
                 scrollTo(x.toInt(), 0)
                 postDelayed(this, 40)
             } else {
-                if (scrollX != 0) scrollTo(0, 0)
-                if (gravity != baseGravity) gravity = baseGravity
-                postDelayed(this, 1000)
+                if (scrolling) {
+                    scrolling = false
+                    scrollTo(0, 0)
+                    setHorizontallyScrolling(false)
+                    gravity = baseGravity
+                }
+                postDelayed(this, if (avail <= 0) 200 else 1000)
             }
         }
     }

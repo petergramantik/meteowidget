@@ -128,12 +128,19 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
     /** poslední stisk ovladače – po 5 min bez ovládání se Zítra vrátí na Dnes */
     var lastInput = System.currentTimeMillis()
 
+    /** je zobrazená vnořená karta (Předpověď, Radar…) s focusem v obsahu? – pak focus nebrat */
+    var contentHasFocus: () -> Boolean = { false }
+    /** po 5 min bez ovládání zpět na Dnes (volá aktivita – skryje i vnořenou kartu) */
+    var onIdleReturn: (() -> Unit)? = null
+
     private val tick = object : Runnable {
         override fun run() {
             if (!running) return
-            if (home.tomorrow && System.currentTimeMillis() - lastInput > 5 * 60_000) {
+            if (home.activeTab != TvHome.TAB_TODAY && System.currentTimeMillis() - lastInput > 5 * 60_000) {
                 home.tomorrow = false
                 focusedTab = TvHome.TAB_TODAY
+                home.activeTab = TvHome.TAB_TODAY
+                onIdleReturn?.invoke()
             }
             maybeSync()
             render()
@@ -194,7 +201,7 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
                 android.view.View.OnFocusChangeListener { v, has -> old?.onFocusChange(v, has); if (has) focusedTab = i }
             })
         }
-        home.tabViews.getOrNull(focusedTab)?.requestFocus()
+        if (!contentHasFocus()) home.tabViews.getOrNull(focusedTab)?.requestFocus()
         // posun obsahu o pár dp každých 10 minut
         val now = System.currentTimeMillis()
         if (now - lastShift > 10 * 60_000) {

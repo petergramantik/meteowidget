@@ -218,11 +218,17 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         val ds = f.days.filter { !it.date.isBefore(LocalDate.now()) }
         if (ds.isEmpty()) return
         val c = a.card("${ds.size} dní")
-        c.addView(a.text("Klepni na den pro podrobnosti", 11f, C.DIM), a.lp(bottom = 6))
+        if (!a.isTv()) c.addView(a.text("Klepni na den pro podrobnosti", 11f, C.DIM), a.lp(bottom = 6))
         val tf = DateTimeFormatter.ofPattern("HH:mm")
         val hourDays = f.hours.map { it.time.toLocalDate() }.toSet()
+        val tv = a.isTv()
         for ((di, d) in ds.withIndex()) {
             val jump = di < 3 && d.date in hourDays
+            if (tv && d.date !in expanded) {
+                // TV: kompaktní řádek (7 dní na obrazovku) se srážkovým páskem 12 × 2 h
+                c.addView(tvDayRow(f, d, jump), a.lp(bottom = 4))
+                continue
+            }
             val box = a.vbox().apply {
                 background = rounded(C.CARD2, a.dp(12).toFloat())
                 setPadding(a.dp(10), a.dp(8), a.dp(10), a.dp(8))
@@ -294,6 +300,50 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         }, a.lp(h = a.dp(200), top = 8))
         c.addView(a.text("● max  ● min  ▮ srážky (mm, pravá osa)", 11f, C.DIM), a.lp(top = 4))
         content.addView(c, a.lp(bottom = 10))
+    }
+
+    /** TV: kompaktní řádek dne se srážkovým páskem. */
+    private fun tvDayRow(f: FullForecast, d: DayF, jump: Boolean): View {
+        val box = a.hbox().apply {
+            background = if (jump) rounded(0xFF1D2630.toInt(), a.dp(10).toFloat(), a.dp(1), 0x66FFD54F)
+            else rounded(C.CARD2, a.dp(10).toFloat())
+            setPadding(a.dp(10), a.dp(3), a.dp(10), a.dp(3))
+            isClickable = true
+            isFocusable = true
+        }
+        box.addView(a.vbox().apply {
+            addView(a.text(dayName(d.date), 13f, C.WHITE, bold = true).apply { maxLines = 1 })
+            addView(a.text(d.date.format(DateTimeFormatter.ofPattern("d.M.")), 10f, C.DIM))
+        }, a.lp(a.dp(62), WRAP))
+        box.addView(a.icon(d.icon, 30))
+        box.addView(a.vbox().apply {
+            addView(a.text(ForecastFull.describe(d.code), 11.5f, C.LABEL).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+            addView(a.text("${f1(d.precip)} mm · ${d.prob.coerceAtLeast(0)} %", 10.5f, C.RAIN))
+        }, a.lp(a.dp(120), WRAP, start = 6))
+        // srážky po 2 hodinách
+        val strip = RainStripView(a)
+        val hrs = f.hours.filter { it.time.toLocalDate() == d.date }
+        if (hrs.isNotEmpty()) {
+            val rain = DoubleArray(12) { Double.NaN }
+            val snow = DoubleArray(12)
+            hrs.groupBy { it.time.hour / 2 }.forEach { (slot, list) ->
+                rain[slot] = list.sumOf { it.precip.coerceAtLeast(0.0) }
+                snow[slot] = list.sumOf { it.snow.coerceAtLeast(0.0) } * 0.7 // cm sněhu -> mm vody (přibližně)
+            }
+            strip.rain = rain
+            strip.snow = snow
+            if (d.date == LocalDate.now()) strip.pastBefore = LocalDateTime.now().hour / 2
+        }
+        box.addView(strip, a.lp(0, a.dp(30), 1f, start = 8, end = 8))
+        box.addView(a.text(deg(d.tMax), 16f, C.IN, condensed = true), a.lp(WRAP, WRAP, end = 6))
+        box.addView(a.text(deg(d.tMin), 14f, 0xFF8FB3FF.toInt(), condensed = true))
+        box.addView(a.text(if (jump) "›" else " ", 20f, C.ACCENT, bold = true), a.lp(a.dp(14), WRAP, start = 6))
+        box.setOnClickListener {
+            if (jump) { mode = Mode.D3; scrollTo = d.date } else expanded.add(d.date)
+            refresh()
+        }
+        box.tvFocus(if (jump) 0x66FFD54F else 0, 1.0f)
+        return box
     }
 
     // ---------- přesnost předpovědí ----------

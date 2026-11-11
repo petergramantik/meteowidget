@@ -4,6 +4,12 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
+import android.widget.FrameLayout
+import cz.gramantik.meteowidget.ui.AlertsScreen
+import cz.gramantik.meteowidget.ui.ForecastScreen
+import cz.gramantik.meteowidget.ui.RadarScreen
+import cz.gramantik.meteowidget.ui.StationScreen
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -35,8 +41,19 @@ class DashboardActivity : Activity() {
         TvSchedule.reschedule(this)
         panel = TvPanel(this, interactive = true)
         panel.home.onTab = { openTab(it) }
-        setContentView(panel.root)
-        panel.showHint("← → záložky (Dnes / Zítra hned)  ·  OK otevřít  ·  ↑ ↓ jas")
+        panel.contentHasFocus = { cardHost.visibility == View.VISIBLE && cardHost.hasFocus() }
+        panel.onIdleReturn = { showCard(TvHome.TAB_TODAY) }
+        // vnořené karty (Předpověď, Radar, Historie, Upozornění) pod horním menu
+        cardHost = FrameLayout(this).apply {
+            setBackgroundColor(android.graphics.Color.BLACK)
+            visibility = View.GONE
+            descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
+        }
+        val host = FrameLayout(this)
+        host.addView(panel.root, FrameLayout.LayoutParams(-1, -1))
+        host.addView(cardHost, FrameLayout.LayoutParams(-1, -1))
+        setContentView(host)
+        panel.showHint("← → karty  ·  ↓ do obsahu, ↑ zpět do menu  ·  OK na Dnes ranní / běžný pohled")
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             window.insetsController?.let {
                 it.hide(WindowInsets.Type.systemBars())
@@ -57,6 +74,7 @@ class DashboardActivity : Activity() {
     override fun onResume() {
         super.onResume()
         panel.start()
+        cards[panel.home.activeTab]?.refresh()
     }
 
     override fun onPause() {
@@ -67,6 +85,7 @@ class DashboardActivity : Activity() {
     override fun onDestroy() {
         if (TvSchedule.running?.get() === this) TvSchedule.running = null
         countdownHandler.removeCallbacks(countdown)
+        cards.values.forEach { it.destroy() }
         panel.release()
         super.onDestroy()
     }
@@ -135,19 +154,114 @@ class DashboardActivity : Activity() {
 
     private fun openSettings() = startActivity(Intent(this, SettingsActivity::class.java))
 
-    /** Záložky: 0 Dnes, 1 Zítra, 2 Předpověď, 3 Radar, 4 Historie, 5 Nastavení. */
+    // ---------- vnořené karty ----------
+    private lateinit var cardHost: FrameLayout
+    private val cards = HashMap<Int, MainActivity.Screen>()
+    private val cardHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingCard: Runnable? = null
+    private fun isCard(i: Int) = i == TvHome.TAB_FORECAST || i == TvHome.TAB_RADAR || i == TvHome.TAB_HISTORY || i == TvHome.TAB_ALERTS
+
+    /** Zobrazí kartu podle záložky (Dnes/Zítra = TV panel, ostatní vnořené obrazovky). */
+    fun showCard(i: Int) {
+        pendingCard?.let { cardHandler.removeCallbacks(it) }
+        if (i == TvHome.TAB_SETTINGS) return
+        panel.home.activeTab = i
+        if (!isCard(i)) {
+            cardHost.visibility = View.GONE
+            val wantTomorrow = i == TvHome.TAB_TOMORROW
+            panel.home.tomorrow = wantTomorrow
+            panel.render()
+            return
+        }
+        // krátká prodleva, aby rychlé přejetí šipkou nic zbytečně nestavělo
+        val r = Runnable {
+            val s = cards[i] ?: when (i) {
+                TvHome.TAB_FORECAST -> ForecastScreen(this)
+                TvHome.TAB_RADAR -> RadarScreen(this)
+                TvHome.TAB_HISTORY -> StationScreen(this)
+                else -> AlertsScreen(this)
+            }.also { cards[i] = it }
+            if (i == TvHome.TAB_ALERTS) { s.refresh(); NotifyLog.markAllRead(this) }
+            if (cardHost.getChildAt(0) !== s.view) {
+                cardHost.removeAllViews()
+                (s.view.parent as? android.view.ViewGroup)?.removeView(s.view)
+                cardHost.addView(s.view, FrameLayout.LayoutParams(-1, -1))
+            }
+            placeCardHost()
+            cardHost.visibility = View.VISIBLE
+            panel.render() // zvýraznění aktivní záložky
+        }
+        pendingCard = r
+        cardHandler.postDelayed(r, 250)
+    }
+
+    /** Karta začíná pod řádkem horního menu. */
+    private fun placeCardHost() {
+        val tab = panel.home.tabViews.firstOrNull() ?: return
+        val loc = IntArray(2).also { tab.getLocationOnScreen(it) }
+        val hostLoc = IntArray(2).also { (cardHost.parent as View).getLocationOnScreen(it) }
+        val d = resources.displayMetrics.density
+        val top = (loc[1] - hostLoc[1] + tab.height * tab.scaleY * (tab.parent.parent as View).scaleY + 6 * d).toInt()
+        val side = (resources.displayMetrics.widthPixels * 0.03f).toInt()
+        val lp = cardHost.layoutParams as FrameLayout.LayoutParams
+        if (lp.topMargin != top) {
+            lp.topMargin = top.coerceAtLeast(0)
+            cardHost.layoutParams = lp
+        }
+        cardHost.setPadding(side, 0, side, (resources.displayMetrics.heightPixels * 0.03f).toInt())
+    }
+
+    private fun focusTabs() {
+        panel.home.tabViews.getOrNull(panel.focusedTab)?.requestFocus()
+    }
+
+    /** Volá radar (stránka) na okraji lišty: up = do menu, left/right = vedlejší karta. */
+    fun fromContent(dir: String) {
+        when (dir) {
+            "up" -> focusTabs()
+            "left", "right" -> moveTab(if (dir == "right") 1 else -1, keepContentFocus = false)
+        }
+    }
+
+    private fun moveTab(delta: Int, keepContentFocus: Boolean = false) {
+        val tabs = panel.home.tabViews
+        if (tabs.isEmpty()) return
+        val next = (panel.focusedTab + delta).coerceIn(0, tabs.size - 1)
+        panel.focusedTab = next
+        tabs[next].requestFocus()
+        showCard(next)
+    }
+
+    /** OK na záložce. */
     private fun openTab(i: Int) {
         when (i) {
             TvHome.TAB_TODAY -> {
+                showCard(i)
                 // ranní režim: OK přepne ranní ↔ běžný pohled
-                if (!panel.home.tomorrow && MorningPrefs(this).toggle()) panel.render() else panel.refreshNow()
+                if (MorningPrefs(this).toggle()) panel.render() else panel.refreshNow()
             }
-            TvHome.TAB_TOMORROW -> panel.refreshNow()
-            2 -> startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, 1))
-            3 -> startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, 2))
-            4 -> startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, 0))
-            5 -> openSettings()
+            TvHome.TAB_TOMORROW -> { showCard(i); panel.refreshNow() }
+            TvHome.TAB_SETTINGS -> openSettings()
+            else -> {
+                // vstup do obsahu karty
+                showCard(i)
+                cardHandler.postDelayed({ cardHost.requestFocus(View.FOCUS_DOWN) }, 300)
+            }
         }
+    }
+
+    private fun sameRow(a: View, b: View): Boolean {
+        val ra = IntArray(2).also { a.getLocationOnScreen(it) }
+        val rb = IntArray(2).also { b.getLocationOnScreen(it) }
+        val top = maxOf(ra[1], rb[1])
+        val bottom = minOf(ra[1] + a.height, rb[1] + b.height)
+        return bottom - top > minOf(a.height, b.height) / 2
+    }
+
+    private fun isInCard(v: View?): Boolean {
+        var p: Any? = v
+        while (p is View) { if (p === cardHost) return true; p = p.parent }
+        return false
     }
 
     /** Ovládání ovladačem zachycené na úrovni okna. */
@@ -156,29 +270,47 @@ class DashboardActivity : Activity() {
         panel.lastInput = System.currentTimeMillis()
         cancelAutoClose()
         val tabs = panel.home.tabViews
+        val inContent = cardHost.visibility == View.VISIBLE && cardHost.hasFocus()
+        val f = currentFocus
+        if (inContent) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_BACK -> { focusTabs(); return true }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (f is android.webkit.WebView) return super.dispatchKeyEvent(event)
+                    val next = f?.focusSearch(View.FOCUS_UP)
+                    if (next == null || !isInCard(next)) { focusTabs(); return true }
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (f is android.webkit.WebView || f is android.widget.SeekBar) return super.dispatchKeyEvent(event)
+                    val dir = if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1
+                    val next = f?.focusSearch(if (dir > 0) View.FOCUS_RIGHT else View.FOCUS_LEFT)
+                    if (f == null || next == null || !isInCard(next) || !sameRow(f, next)) { moveTab(dir); return true }
+                }
+            }
+            return super.dispatchKeyEvent(event)
+        }
         when (event.keyCode) {
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> { openSettings(); return true }
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                val b = panel.changeBrightness(if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) 5 else -5)
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (cardHost.visibility == View.VISIBLE) {
+                    // do obsahu karty
+                    if (!cardHost.requestFocus(View.FOCUS_DOWN)) cardHost.getChildAt(0)?.requestFocus()
+                    return true
+                }
+                val b = panel.changeBrightness(-5)
+                show((if (panel.isNight) "Noční jas" else "Jas") + ": $b %")
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                val b = panel.changeBrightness(5)
                 show((if (panel.isNight) "Noční jas" else "Jas") + ": $b %")
                 return true
             }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (tabs.isEmpty()) return true
                 val cur = tabs.indexOfFirst { it.isFocused }.let { if (it < 0) panel.focusedTab else it }
-                val next = (cur + if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1).coerceIn(0, tabs.size - 1)
-                tabs[next].requestFocus()
-                panel.focusedTab = next
-                // Dnes / Zítra se přepnou hned, bez OK
-                val wantTomorrow = when (next) {
-                    TvHome.TAB_TODAY -> false
-                    TvHome.TAB_TOMORROW -> true
-                    else -> panel.home.tomorrow
-                }
-                if (wantTomorrow != panel.home.tomorrow) {
-                    panel.home.tomorrow = wantTomorrow
-                    panel.render()
-                }
+                panel.focusedTab = cur
+                moveTab(if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1)
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,

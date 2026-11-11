@@ -41,7 +41,10 @@
   #attr a { color: rgba(255,255,255,.8); }
   #msg { position: absolute; top: 40%; width: 100%; text-align: center; color: rgba(255,255,255,.75); z-index: 999; pointer-events: none; }
   .leaflet-control-attribution { display: none; }
-  .pin { width: 14px; height: 14px; border-radius: 7px; background: #ffd54f; border: 2px solid #060709; box-shadow: 0 0 0 2px #ffd54f; }
+  .home { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+  .home .nm { font: bold 12px sans-serif; color: #fff; background: rgba(6,7,9,.75); padding: 1px 6px; border-radius: 8px;
+              white-space: nowrap; margin-bottom: 2px; }
+  .home svg { width: 20px; height: 20px; filter: drop-shadow(0 0 2px #060709); }
   .pin2 { width: 12px; height: 12px; border-radius: 6px; background: #3ddc97; border: 2px solid #060709; box-shadow: 0 0 0 2px #3ddc97; }
   /* ---------- televize: ovládání lištou tlačítek ---------- */
   body.tv #search, body.tv #slider, body.tv #layers, body.tv #opRow, body.tv .leaflet-control-zoom { display: none !important; }
@@ -51,9 +54,11 @@
   body.tv #play { display: none; }
   #tvbar { display: none; gap: 8px; margin-top: 8px; }
   body.tv #tvbar { display: flex; }
-  .tvb { flex: none; padding: 7px 14px; border-radius: 16px; font-size: 15px; border: 1px solid rgba(255,255,255,.25);
+  .tvb { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 12px; font-size: 14px;
+         border: 1px solid rgba(255,255,255,.18);
          background: #171b21; color: #fff; white-space: nowrap; }
   .tvb.f { background: #ffd54f; color: #060709; border-color: #ffd54f; font-weight: bold; }
+  .tvb svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   #legend { position: absolute; right: 10px; bottom: 170px; z-index: 1000; font-size: 11px; color: rgba(255,255,255,.75);
             background: rgba(16,19,23,.85); padding: 4px 8px; border-radius: 8px; display: none; }
 </style>
@@ -125,8 +130,13 @@
         : '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
       if (window.drawChips) drawChips();
     }
-    L.marker([lat, lon], { icon: L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [18, 18] }) })
-      .addTo(map).bindTooltip(placeName || 'Stanice');
+    // domov: menší žlutý domeček s názvem místa nad ním
+    var esc = function (t) { return String(t).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); };
+    var houseSvg = '<svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5.5v-6h-5v6H4a1 1 0 0 1-1-1z" ' +
+      'fill="#ffd54f" stroke="#060709" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    L.marker([lat, lon], { interactive: false, icon: L.divIcon({ className: '',
+      html: '<div class="home"><div class="nm">' + esc(placeName || 'Domov') + '</div>' + houseSvg + '</div>',
+      iconSize: [120, 40], iconAnchor: [60, 38] }) }).addTo(map);
 
     // ---------- radar ----------
     var host = '', frames = [], layers = {}, idx = 0, timer = null;
@@ -321,19 +331,30 @@
         if (id === 'radar') { showRadar = true; setOverlay(null); show(idx); }
         else { showRadar = false; show(idx); setOverlay(id); }
       }
-      var baseNames = { sat: '🛰 Satelit', osm: '🗺 Běžná', dark: '🌙 Tmavá' };
+      var IC = {
+        play: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+        pause: '<svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>',
+        prev: '<svg viewBox="0 0 24 24"><path d="M6 5v14M19 5 9 12l10 7z"/></svg>',
+        next: '<svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>',
+        minus: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M16 16l4 4"/></svg>',
+        plus: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M16 16l4 4"/></svg>',
+        view: '<svg viewBox="0 0 24 24"><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
+        layer: '<svg viewBox="0 0 24 24"><path d="M12 4 3 9l9 5 9-5zM3 14l9 5 9-5"/></svg>',
+        map: '<svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg>',
+      };
+      var baseNames = { sat: 'Satelit', osm: 'Běžná', dark: 'Tmavá' };
       var tvButtons = [
-        { t: function () { return timer ? '❚❚ Zastavit' : '▶ Přehrát'; }, a: function () { timer ? stop() : play(); } },
-        { t: function () { return '⏮'; }, a: function () { stop(); show(idx - 1); } },
-        { t: function () { return '⏭'; }, a: function () { stop(); show(idx + 1); } },
-        { t: function () { return '➖'; }, a: function () { map.setZoom(Math.max(4, map.getZoom() - 1)); } },
-        { t: function () { return '➕'; }, a: function () { map.setZoom(Math.min(12, map.getZoom() + 1)); } },
-        { t: function () { return '📍 ' + VIEWS[viewIdx].name; }, a: function () {
+        { t: function () { return timer ? IC.pause + 'Zastavit' : IC.play + 'Přehrát'; }, a: function () { timer ? stop() : play(); } },
+        { t: function () { return IC.prev; }, a: function () { stop(); show(idx - 1); } },
+        { t: function () { return IC.next; }, a: function () { stop(); show(idx + 1); } },
+        { t: function () { return IC.minus; }, a: function () { map.setZoom(Math.max(4, map.getZoom() - 1)); } },
+        { t: function () { return IC.plus; }, a: function () { map.setZoom(Math.min(12, map.getZoom() + 1)); } },
+        { t: function () { return IC.view + VIEWS[viewIdx].name; }, a: function () {
             viewIdx = (viewIdx + 1) % VIEWS.length; map.setView(VIEWS[viewIdx].c, VIEWS[viewIdx].z); } },
-        { t: function () { return '🌧 ' + layerName(activeLayer()); }, a: function () {
+        { t: function () { return IC.layer + layerName(activeLayer()); }, a: function () {
             if (tvLayers.length < 2) { alertMsg('Další vrstvy (oblačnost, teplota, vítr) potřebují klíč OpenWeatherMap.'); return; }
             setTvLayer(tvLayers[(tvLayers.indexOf(activeLayer()) + 1) % tvLayers.length]); } },
-        { t: function () { return baseNames[baseMode] || 'Mapa'; }, a: function () {
+        { t: function () { return IC.map + (baseNames[baseMode] || 'Mapa'); }, a: function () {
             var order = mapyKey ? ['sat', 'osm', 'dark'] : ['osm', 'dark'];
             setBase(order[(order.indexOf(baseMode) + 1) % order.length]); } },
       ];
@@ -343,7 +364,7 @@
         tvButtons.forEach(function (b, i) {
           var e = document.createElement('div');
           e.className = 'tvb' + (tvFocused && i === tvSel ? ' f' : '');
-          e.textContent = b.t();
+          e.innerHTML = b.t();
           bar.appendChild(e);
         });
       };

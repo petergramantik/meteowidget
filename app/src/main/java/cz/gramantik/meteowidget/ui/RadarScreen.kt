@@ -44,6 +44,7 @@ class RadarScreen(private val a: Activity) : MainActivity.Screen {
                 @android.webkit.JavascriptInterface
                 fun leave(dir: String) {
                     web.post {
+                        (a as? cz.gramantik.meteowidget.DashboardActivity)?.let { it.fromContent(dir); return@post }
                         if (dir == "left" || dir == "right") {
                             (a as? MainActivity)?.swipe(if (dir == "right") 1 else -1)
                             return@post

@@ -75,7 +75,8 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
     private var lastShift = 0L
 
     private val content = FrameLayout(ctx)
-    private val dim = View(ctx).apply { setBackgroundColor(Color.BLACK) }
+    /** černá vrstva pro jas / noční režim (vnořené karty se vkládají pod ni) */
+    val dim = View(ctx).apply { setBackgroundColor(Color.BLACK) }
 
     val root: FrameLayout = FrameLayout(ctx).apply {
         setBackgroundColor(Color.BLACK)

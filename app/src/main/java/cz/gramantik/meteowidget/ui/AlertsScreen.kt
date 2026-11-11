@@ -77,10 +77,10 @@ class AlertsScreen(private val a: Activity) : MainActivity.Screen {
                 setOnClickListener { _ -> open(it.id) }
                 tvFocus(scale = 1.0f)
             }
-            row.addView(a.text(hf.format(Date(it.t)), 12f, C.DIM, condensed = true), a.lp(a.dp(44), LinearLayout.LayoutParams.WRAP_CONTENT))
+            row.addView(a.text(hf.format(Date(it.t)), 12f, C.LABEL, condensed = true), a.lp(a.dp(44), LinearLayout.LayoutParams.WRAP_CONTENT))
             row.addView(a.vbox().apply {
                 addView(a.text(it.title, 14f, if (it.read) C.WHITE else C.ACCENT, bold = true))
-                addView(a.text(it.text, 12.5f, C.LABEL), a.lp(top = 1))
+                addView(a.text(it.text, 12.5f, 0xFFDDE3EA.toInt()), a.lp(top = 1))
             }, a.lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             hc.addView(row)
         }

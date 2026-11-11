@@ -49,10 +49,9 @@ class DashboardActivity : Activity() {
             visibility = View.GONE
             descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
         }
-        val host = FrameLayout(this)
-        host.addView(panel.root, FrameLayout.LayoutParams(-1, -1))
-        host.addView(cardHost, FrameLayout.LayoutParams(-1, -1))
-        setContentView(host)
+        // karty vložit pod vrstvu jasu, aby se ztlumily stejně jako Dnes a Zítra
+        panel.root.addView(cardHost, panel.root.indexOfChild(panel.dim), FrameLayout.LayoutParams(-1, -1))
+        setContentView(panel.root)
         panel.showHint("← → karty  ·  ↓ do obsahu, ↑ zpět do menu  ·  OK obnovit")
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             window.insetsController?.let {

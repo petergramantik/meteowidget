@@ -330,7 +330,7 @@ object TvMorning {
         }
         cols.addView(warnCol, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.15f))
         box.addView(cols, c.lp(h = 0, weight = 1f, top = 5))
-        box.layoutParams = c.lp(0, c.dp(height), 1f)
+        box.layoutParams = c.lp(0, if (height > 0) c.dp(height) else LinearLayout.LayoutParams.MATCH_PARENT, 1f)
         return box
     }
 }

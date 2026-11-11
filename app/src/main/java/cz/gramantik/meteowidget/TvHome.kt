@@ -112,7 +112,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                     background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
                     setPadding(c.dp(5), c.dp(3), c.dp(4), c.dp(3))
                     addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
-                    addView(c.text(hd.second, 12f, hd.third, condensed = true).apply { maxLines = 1 }, c.lp(WRAP, WRAP, top = 1))
+                    addView(c.text(hd.second, 13f, hd.third, condensed = true).apply { maxLines = 1 }, c.lp(WRAP, WRAP, top = 1))
                     addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
                 }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
             }
@@ -245,8 +245,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                     background = rounded(C.CARD, c.dp(8).toFloat(), c.dp(1), C.LINE)
                     setPadding(c.dp(5), c.dp(2), c.dp(4), c.dp(2))
                     addView(c.label(hd.first).apply { textSize = 7f; maxLines = 1 })
-                    addView(c.text(hd.second, 11.5f, hd.third, condensed = true).apply { maxLines = 1 })
-                    addView(c.text(sub.ifEmpty { " " }, 7f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                    addView(c.text(hd.second, 13f, hd.third, condensed = true).apply { maxLines = 1 })
+                    addView(c.text(sub.ifEmpty { " " }, 7.5f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
                 }, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 2) 4 else 0))
             }
             lgrid.addView(r, c.lp(h = 0, weight = 1f, bottom = if (ri == 0) 3 else 0))
@@ -256,13 +256,13 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         else if (p.lastUpdate > 0 && System.currentTimeMillis() - p.lastUpdate > 15 * 60_000)
             left.addView(c.text("⚠ data z " + java.text.SimpleDateFormat("HH:mm", cz).format(Date(p.lastUpdate)), 9f, C.ACCENT), c.lp(top = 3))
         }
-        row.addView(left, c.lp(c.dp(255), c.dp(168), end = 8))
+        row.addView(left, c.lp(c.dp(255), LinearLayout.LayoutParams.MATCH_PARENT, end = 8))
         val nowHour = LocalDateTime.now().withMinute(0).withSecond(0).withNano(0)
         val hours = f?.hours?.filter { !it.time.isBefore(nowHour) } ?: emptyList()
         if (tomorrow) {
-            row.addView(TvMorning.build(c, 168, today.plusDays(1)))
+            row.addView(TvMorning.build(c, 0, today.plusDays(1)))
         } else if (morning) {
-            row.addView(TvMorning.build(c, 168))
+            row.addView(TvMorning.build(c, 0))
         } else {
 
 
@@ -309,9 +309,10 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             }, c.lp(0, WRAP, 1f, start = 6))
             right.addView(r)
         }
-        row.addView(right, c.lp(0, c.dp(168), 1f))
+        row.addView(right, c.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         }
-        root.addView(row)
+        // horní panely dostanou všechnu výšku, kterou nepotřebuje spodní předpověď
+        root.addView(row, c.lp(h = 0, weight = 1f))
 
         // ---------- dole: předpověď 12 h + 10 dní ----------
         val bottom = panel()
@@ -358,7 +359,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         if (interactive) {
             bottom.addView(c.text((if (MorningPrefs(c).scheduled()) "← → záložky (Dnes / Zítra se přepnou hned) · OK otevřít, na Dnes ranní / běžný pohled · ↑ ↓ jas" else "← → záložky (Dnes / Zítra se přepnou hned) · OK otevřít · ↑ ↓ jas · Menu = nastavení"), 8f, 0x66FFFFFF), c.lp(top = 2))
         }
-        root.addView(bottom, c.lp(h = 0, weight = 1f, top = 8))
+        root.addView(bottom, c.lp(top = 6))
         return root
     }
 }

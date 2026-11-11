@@ -7,6 +7,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -148,7 +149,39 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         refresh()
     }
 
+    /** TV: Doma, Venku a čidla v jednom řádku. */
+    private fun currentTv(p: Prefs, w: Weather) {
+        val big = a.card()
+        val row = a.hbox(Gravity.CENTER_VERTICAL)
+        val chans = listOf(Triple(Channel.IN, w.tempIn, w.humIn) to C.IN, Triple(Channel.OUT, w.tempOut, w.humOut) to C.OUT) +
+            listOf(Channel.S1, Channel.S2, Channel.S3).mapNotNull { ch -> w.temp(ch.tempCode)?.let { Triple(ch, it, w.hum(ch.humCode)) to C.SENSOR } }
+        chans.forEachIndexed { i, (tr, color) ->
+            val (ch, temp, hum) = tr
+            if (i > 0) row.addView(a.text("·", 18f, C.DIM), a.lp(WRAP, WRAP, start = 4, end = 4))
+            row.addView(a.hbox(Gravity.BOTTOM).apply {
+                setPadding(a.dp(8), a.dp(4), a.dp(8), a.dp(4))
+                addView(a.text(p.channelName(ch) + if (openChannel == ch) " ▾" else "", 13f, C.LABEL, bold = true), a.lp(WRAP, WRAP, end = 6))
+                addView(a.text(t(temp), 24f, color, condensed = true))
+                addView(a.text(" " + Weather.h(hum), 14f, color, condensed = true))
+                if (openChannel == ch) background = rounded(C.CARD2, a.dp(10).toFloat(), a.dp(1), 0x88FFD54F.toInt())
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { toggleChannel(ch) }
+                tvFocus(if (openChannel == ch) 0x88FFD54F.toInt() else C.LINE, 1.0f)
+            }, a.lp(WRAP, WRAP))
+        }
+        big.addView(HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(row) })
+        content.addView(big, a.lp(bottom = 10))
+    }
+
     private fun current(p: Prefs, w: Weather) {
+        if (a.isTv()) {
+            currentTv(p, w)
+            openChannel?.let { channelCharts(p, it) }
+            humidityChart(p)
+            currentTiles(w)
+            return
+        }
         val big = a.card()
         val row = a.hbox(Gravity.TOP)
         val selBg = { rounded(C.CARD2, a.dp(12).toFloat(), a.dp(1), 0x88FFD54F.toInt()) }
@@ -183,7 +216,10 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
         content.addView(SwipeFrame(a) { (a as? MainActivity)?.swipe(it) }.apply { addView(big) }, a.lp(bottom = 10))
         openChannel?.let { channelCharts(p, it) }
         humidityChart(p)
+        currentTiles(w)
+    }
 
+    private fun currentTiles(w: Weather) {
         val trend = PressureHistory.trend3h(a)
         val arrow = when { trend == null -> ""; trend >= 1 -> " ↗"; trend <= -1 -> " ↘"; else -> " →" }
         val tiles = listOf(

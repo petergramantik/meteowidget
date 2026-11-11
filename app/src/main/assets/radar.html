@@ -193,11 +193,15 @@
         (idx === frames.length - 1 ? ' (teď)' : '');
       slider.value = idx;
     }
-    function stop() { if (timer) { clearInterval(timer); timer = null; } playBtn.textContent = '▶'; if (window.drawTv) drawTv(); }
+    function stop() { if (timer) { clearTimeout(timer); timer = null; } playBtn.textContent = '▶'; if (window.drawTv) drawTv(); }
     function play() {
       stop(); playBtn.textContent = '❚❚';
-      // poslední snímek (teď) chvíli podržet
-      timer = setInterval(function () { show(idx + 1); }, 600);
+      // na posledním snímku (teď) se animace na 3 s zastaví
+      var tick = function () {
+        show(idx + 1);
+        timer = setTimeout(tick, idx === frames.length - 1 ? 3000 : 600);
+      };
+      timer = setTimeout(tick, idx === frames.length - 1 ? 3000 : 600);
       if (window.drawTv) drawTv();
     }
     playBtn.onclick = function () { timer ? stop() : play(); };

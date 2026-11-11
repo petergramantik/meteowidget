@@ -496,6 +496,14 @@ class SettingsActivity : Activity() {
         }
         box.addView(updateBanner, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = (10 * d).toInt() })
         refreshUpdateBanner()
+        // kontrola nové verze při každém otevření nastavení (na pozadí)
+        Thread {
+            try { Updater.check(this) } catch (e: Exception) { }
+            runOnUiThread {
+                refreshUpdateBanner()
+                if (isTv() && openSection == null && updateBanner?.visibility == View.VISIBLE && currentFocus !is EditText) updateBanner?.requestFocus()
+            }
+        }.start()
         sections.forEach { sec ->
             val st = TextView(this).apply { textSize = 13f; setTextColor(0xFF8A8A8A.toInt()) }
             val row = android.widget.LinearLayout(this).apply {

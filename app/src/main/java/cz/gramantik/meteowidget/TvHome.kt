@@ -309,7 +309,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
             Triple("POCITOVĚ", t(w?.feelsLike), C.FEELS) to (todayF?.let { "dnes ${deg(it.feelsMax)} / ${deg(it.feelsMin)}" } ?: "rosný bod ${t(w?.dewPoint)}"),
             Triple("VÍTR", "${f1(w?.windAvg)} km/h", C.WIND) to ("nárazy ${f1(w?.windGust)}" + (todayF?.let { " · až ${it.gustMax.roundToInt()}" } ?: "")),
             Triple("SRÁŽKY DNES", "${f1(w?.rainDay)} mm", C.RAIN) to (w?.rainRate?.takeIf { it > 0 }?.let { "prší ${f1(it)} mm/h" }
-                ?: todayF?.let { "předpověď ${f1(it.precip)} mm · ${it.prob.coerceAtLeast(0)} %" } ?: "neprší"),
+                ?: todayF?.let { "~ ${f1(it.precip)} mm · ${it.prob.coerceAtLeast(0)} %" } ?: "neprší"),
             Triple("TLAK", (w?.pressure?.let { String.format(cz, "%.0f", it) } ?: "--") + " hPa$arrow", C.BARO) to (trend?.let { "za 3 h " + String.format(cz, "%+.1f", it) } ?: ""),
             Triple("UV", f1(w?.uv), C.UV) to (todayF?.let { "max ${f1(it.uvMax)} · svit ${f1(it.sunshineH)} h" } ?: ""),
             Triple("VENKU DNES", if (mn != null && mx != null) "${f1(mn.second)}° / ${f1(mx.second)}°" else "--", C.OUT) to

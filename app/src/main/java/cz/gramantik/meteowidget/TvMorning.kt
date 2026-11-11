@@ -25,35 +25,10 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
 
-/** Nastavení ranního režimu TV panelu. */
+/** Nastavení panelu s pozdravem a upozorněními (karta Dnes na TV). */
 class MorningPrefs(ctx: Context) {
     private val sp = ctx.applicationContext.getSharedPreferences("meteo", Context.MODE_PRIVATE)
 
-    companion object {
-        const val OFF = 0
-        const val MORNING = 1
-        const val ALL_DAY = 2
-
-        /** OK na záložce Dnes přepne na běžný pohled – platí do konce okna (jen v paměti). */
-        @Volatile var dismissedUntil = 0L
-
-        fun parse(s: String): LocalTime? = try {
-            val parts = s.trim().replace('.', ':').split(':')
-            LocalTime.of(parts[0].toInt().coerceIn(0, 23), parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0)
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    var mode: Int
-        get() = sp.getInt("tmMode", MORNING)
-        set(v) = sp.edit().putInt("tmMode", v).apply()
-    var from: String
-        get() = sp.getString("tmFrom", "05:00")!!
-        set(v) = sp.edit().putString("tmFrom", v).apply()
-    var to: String
-        get() = sp.getString("tmTo", "10:00")!!
-        set(v) = sp.edit().putString("tmTo", v).apply()
     var names: String
         get() = sp.getString("tmNames", "Beátko a Petře")!!
         set(v) = sp.edit().putString("tmNames", v.trim()).apply()
@@ -70,42 +45,8 @@ class MorningPrefs(ctx: Context) {
         get() = sp.getFloat("tmRainPct", 50f)
         set(v) = sp.edit().putFloat("tmRainPct", v).apply()
 
-    private fun inWindow(t: LocalTime): Boolean {
-        val a = parse(from) ?: LocalTime.of(5, 0)
-        val b = parse(to) ?: LocalTime.of(10, 0)
-        return if (a <= b) !t.isBefore(a) && t.isBefore(b) else !t.isBefore(a) || t.isBefore(b)
-    }
-
-    /** Má se teď ukázat ranní panel (bez ohledu na ruční přepnutí)? */
-    fun scheduled(now: LocalDateTime = LocalDateTime.now()): Boolean = when (mode) {
-        ALL_DAY -> true
-        MORNING -> inWindow(now.toLocalTime())
-        else -> false
-    }
-
-    fun active(): Boolean = scheduled() && System.currentTimeMillis() >= dismissedUntil
-
-    /** Konec aktuálního okna (pro ruční přepnutí na běžný pohled). */
-    fun windowEnd(): Long {
-        val now = LocalDateTime.now()
-        val end = if (mode == ALL_DAY) now.toLocalDate().plusDays(1).atStartOfDay()
-        else {
-            val b = parse(to) ?: LocalTime.of(10, 0)
-            val e = now.toLocalDate().atTime(b)
-            if (e.isAfter(now)) e else e.plusDays(1)
-        }
-        return end.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    }
-
-    /** Přepne ranní ↔ běžný pohled. Vrací true, pokud se něco změnilo. */
-    fun toggle(): Boolean {
-        if (!scheduled()) return false
-        dismissedUntil = if (System.currentTimeMillis() >= dismissedUntil) windowEnd() else 0L
-        return true
-    }
-
+    /** Pozdrav podle denní doby. */
     fun greeting(now: LocalTime = LocalTime.now()): Pair<String, String> {
-        if (mode != ALL_DAY) return "Dobré ráno" to "☀"
         val m = now.hour * 60 + now.minute
         return when {
             m < 5 * 60 -> "Dobrou noc" to "🌙"

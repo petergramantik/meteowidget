@@ -53,7 +53,7 @@ class DashboardActivity : Activity() {
         host.addView(panel.root, FrameLayout.LayoutParams(-1, -1))
         host.addView(cardHost, FrameLayout.LayoutParams(-1, -1))
         setContentView(host)
-        panel.showHint("← → karty  ·  ↓ do obsahu, ↑ zpět do menu  ·  OK na Dnes ranní / běžný pohled")
+        panel.showHint("← → karty  ·  ↓ do obsahu, ↑ zpět do menu  ·  OK obnovit")
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             window.insetsController?.let {
                 it.hide(WindowInsets.Type.systemBars())
@@ -237,11 +237,7 @@ class DashboardActivity : Activity() {
     /** OK na záložce. */
     private fun openTab(i: Int) {
         when (i) {
-            TvHome.TAB_TODAY -> {
-                showCard(i)
-                // ranní režim: OK přepne ranní ↔ běžný pohled
-                if (MorningPrefs(this).toggle()) panel.render() else panel.refreshNow()
-            }
+            TvHome.TAB_TODAY -> { showCard(i); panel.refreshNow() }
             TvHome.TAB_TOMORROW -> { showCard(i); panel.refreshNow() }
             TvHome.TAB_SETTINGS -> openSettings()
             else -> {

@@ -273,31 +273,13 @@ class SettingsActivity : Activity() {
         hourWatcher(nightFrom) { tv.nightFrom = it }
         hourWatcher(nightTo) { tv.nightTo = it }
 
-        // ---------- televize: ranní režim ----------
+        // ---------- televize: pozdrav a upozornění ----------
         val mp = MorningPrefs(this)
-        val tmMode = findViewById<Spinner>(R.id.tm_mode)
-        val modes = listOf("Vypnuto" to MorningPrefs.OFF, "Jen ráno (v nastaveném čase)" to MorningPrefs.MORNING,
-            "Celý den (pozdrav podle denní doby)" to MorningPrefs.ALL_DAY)
-        tmMode.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, modes.map { it.first })
-        tmMode.setSelection(modes.indexOfFirst { it.second == mp.mode }.coerceAtLeast(0))
-        tmMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, pos: Int, id: Long) {
-                mp.mode = modes[pos].second
-                MorningPrefs.dismissedUntil = 0L
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-        }
-        val tmFrom = findViewById<EditText>(R.id.tm_from)
-        val tmTo = findViewById<EditText>(R.id.tm_to)
         val tmNames = findViewById<EditText>(R.id.tm_names)
-        tmFrom.setText(mp.from); tmTo.setText(mp.to); tmNames.setText(mp.names)
-        val saveMorning = {
-            MorningPrefs.parse(tmFrom.text.toString())?.let { mp.from = String.format("%02d:%02d", it.hour, it.minute) }
-            MorningPrefs.parse(tmTo.text.toString())?.let { mp.to = String.format("%02d:%02d", it.hour, it.minute) }
-            mp.names = tmNames.text.toString()
-        }
+        tmNames.setText(mp.names)
+        val saveMorning = { mp.names = tmNames.text.toString() }
         morningSaver = saveMorning
-        listOf(tmFrom, tmTo, tmNames).forEach { e -> e.setOnFocusChangeListener { _, has -> if (!has) saveMorning() } }
+        tmNames.setOnFocusChangeListener { _, has -> if (!has) saveMorning() }
         bindNum(R.id.tm_frost, mp.frostBelow) { mp.frostBelow = it }
         bindNum(R.id.tm_wind, mp.windFrom) { mp.windFrom = it }
         bindNum(R.id.tm_rain_mm, mp.rainMm) { mp.rainMm = it }
@@ -418,11 +400,7 @@ class SettingsActivity : Activity() {
             Sec(R.id.sec_tv, "📺 Televize") {
                 val mp = MorningPrefs(this)
                 (if (TvSchedule.startEnabled(this)) "start ${TvSchedule.startTime(this)}" else "bez plánu") +
-                    " · ranní režim: " + when (mp.mode) {
-                        MorningPrefs.ALL_DAY -> "celý den"
-                        MorningPrefs.MORNING -> "${mp.from}–${mp.to}"
-                        else -> "vypnuto"
-                    } + if (isTv() && !TvSchedule.canDrawOverlays(this)) " · ⚠ chybí povolení" else ""
+                    " · oslovení: ${mp.names.ifBlank { "—" }}" + if (isTv() && !TvSchedule.canDrawOverlays(this)) " · ⚠ chybí povolení" else ""
             },
             Sec(R.id.sec_data, "🗄 Data a historie") {
                 (if (Battery.isUnrestricted(this)) "✅ sběr bez omezení" else "⚠ omezeno baterií") +

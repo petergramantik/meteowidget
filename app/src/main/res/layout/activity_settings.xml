@@ -286,20 +286,8 @@
 
         <!-- ranní režim – doplní kód -->
         <LinearLayout android:id="@+id/tv_morning_box" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-        <TextView style="@style/Section" android:text="Televize – ranní režim" />
-        <TextView style="@style/Label" android:text="Místo dlaždic a panelu Dnes ukáže pozdrav, dnešní kalendář a na co si dát pozor. Ve 20:00 se kalendář i upozornění přepnou na zítřek. OK na záložce Dnes přepne na běžný pohled a zpět." />
-        <TextView style="@style/Label" android:text="Režim" />
-        <Spinner android:id="@+id/tm_mode" android:layout_width="match_parent" android:layout_height="wrap_content" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
-                <TextView style="@style/Label" android:text="Ráno od (HH:MM)" />
-                <EditText android:id="@+id/tm_from" style="@style/Field" android:inputType="time" android:maxLength="5" />
-            </LinearLayout>
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
-                <TextView style="@style/Label" android:text="Ráno do (HH:MM)" />
-                <EditText android:id="@+id/tm_to" style="@style/Field" android:inputType="time" android:maxLength="5" />
-            </LinearLayout>
-        </LinearLayout>
+        <TextView style="@style/Section" android:text="Televize – pozdrav a upozornění" />
+        <TextView style="@style/Label" android:text="Na kartě Dnes je vpravo pozdrav podle denní doby, kalendář a na co si dát pozor. Ve 20:00 se kalendář i upozornění přepnou na zítřek." />
         <TextView style="@style/Label" android:text="Oslovení (aplikace doplní „Dobré ráno, …“)" />
         <EditText android:id="@+id/tm_names" style="@style/Field" android:inputType="textCapWords" />
         <TextView style="@style/Label" android:text="Prahy upozornění" />

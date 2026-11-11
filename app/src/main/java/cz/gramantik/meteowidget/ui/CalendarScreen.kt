@@ -34,7 +34,7 @@ interface KeyHandler {
  * nadcházející události s odpočtem, čísla týdnů, více kalendářů s barvami, hustota v ročním pohledu.
  */
 class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler {
-    private enum class Mode(val label: String) { YEAR("Rok"), M3("3 měsíce"), M1("Měsíc") }
+    private enum class Mode(val label: String) { YEAR("Rok"), M3("3 měsíce"), M1("Měsíc"), WEEK("Týden") }
 
     private val cz = Locale("cs", "CZ")
     private var mode = Mode.M1
@@ -56,7 +56,20 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
 
     init { refresh() }
 
+    /** volné dny (víkend, státní svátek) – lehce odlišené pozadí */
+    private val FREE_BG = 0xFF2B2430.toInt()
+
     override fun refresh() {
+        // při posunu nechat staré zobrazení, dokud se nenačtou nová data (výběr pak neuteče do menu)
+        if (data.isNotEmpty() && root.childCount > 1 && CalendarIcs.sources(a).isNotEmpty()) {
+            val (f0, t0) = range()
+            if ("$f0|$t0|${CalendarIcs.fetchedAt(a)}" != loadedKey) {
+                root.findViewWithTag<View>("loading")?.visibility = View.VISIBLE
+                if (pendingFocus == null) root.findFocus()?.tag?.let { pendingFocus = it }
+                startLoad(f0, t0)
+                return
+            }
+        }
         // focus po překreslení vrátit na vybraný den / tlačítko
         if (pendingFocus == null) root.findFocus()?.tag?.let { pendingFocus = it }
         root.removeAllViews()
@@ -75,21 +88,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
         val (from, to) = range()
         val key = "$from|$to|${CalendarIcs.fetchedAt(a)}"
         if (key != loadedKey) {
-            if (!loading) {
-                loading = true
-                Thread {
-                    if (!CalendarIcs.hasCache(a)) CalendarIcs.fetch(a)
-                    val upTo = maxOf(to, LocalDate.now().plusDays(90))
-                    val fromR = minOf(from, LocalDate.now())
-                    val m = CalendarIcs.range(a, fromR, upTo)
-                    root.post {
-                        data = m
-                        loadedKey = "$from|$to|${CalendarIcs.fetchedAt(a)}"
-                        loading = false
-                        refresh()
-                    }
-                }.start()
-            }
+            startLoad(from, to)
             root.addView(a.text("Načítám kalendář…", 14f, C.DIM), a.lp(top = 20))
             pendingFocus?.let { t -> root.findViewWithTag<View>(t)?.let { v -> v.post { v.requestFocus() } } }
             return
@@ -98,6 +97,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
             Mode.YEAR -> yearView()
             Mode.M3 -> threeMonths()
             Mode.M1 -> monthView()
+            Mode.WEEK -> weekView()
         }
         root.addView(body, a.lp(h = 0, weight = 1f, top = 4))
         val ft = pendingFocus
@@ -107,12 +107,33 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
         target?.let { v -> v.post { v.requestFocus() } }
     }
 
+    private fun startLoad(from: LocalDate, to: LocalDate) {
+        if (loading) return
+        loading = true
+        Thread {
+            if (!CalendarIcs.hasCache(a)) CalendarIcs.fetch(a)
+            val upTo = maxOf(to, LocalDate.now().plusDays(90))
+            val fromR = minOf(from, LocalDate.now())
+            val m = CalendarIcs.range(a, fromR, upTo)
+            root.post {
+                data = m
+                loadedKey = "$from|$to|${CalendarIcs.fetchedAt(a)}"
+                loading = false
+                // mezitím se mohl rozsah znovu změnit – refresh() případně načte znovu
+                refresh()
+            }
+        }.start()
+    }
+
     // ---------- rozsah dat ----------
     private fun range(): Pair<LocalDate, LocalDate> = when (mode) {
         Mode.YEAR -> LocalDate.of(anchor.year, 1, 1) to LocalDate.of(anchor.year, 12, 31)
         Mode.M3 -> gridStart(anchor) to anchor.plusMonths(2).atEndOfMonth().plusDays(7)
         Mode.M1 -> gridStart(anchor) to anchor.atEndOfMonth().plusDays(7)
+        Mode.WEEK -> weekStart() to weekStart().plusDays(6)
     }
+
+    private fun weekStart(): LocalDate = selected.minusDays((selected.dayOfWeek.value - 1).toLong())
 
     private fun gridStart(m: YearMonth): LocalDate {
         val first = m.atDay(1)
@@ -141,9 +162,16 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
             Mode.YEAR -> anchor.year.toString()
             Mode.M3 -> monthName(anchor) + " – " + monthName(anchor.plusMonths(2))
             Mode.M1 -> monthName(anchor)
+            Mode.WEEK -> {
+                val ws = weekStart()
+                "${ws.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}. týden · ${ws.dayOfMonth}. ${ws.monthValue}. – " +
+                    "${ws.plusDays(6).dayOfMonth}. ${ws.plusDays(6).monthValue}. ${ws.plusDays(6).year}"
+            }
         }
         bar.addView(a.text(title, 18f, C.ACCENT, bold = true).apply { gravity = Gravity.CENTER }, a.lp(a.dp(250), WRAP))
         bar.addView(arrow("›", 1), a.lp(WRAP, WRAP))
+        bar.addView(a.text("načítám…", 11f, C.DIM).apply { tag = "loading"; visibility = if (loading) View.VISIBLE else View.GONE },
+            a.lp(WRAP, WRAP, start = 8))
         bar.addView(View(a), a.lp(0, 1, 1f))
         // kalendáře – barvy, klepnutím skrýt / zobrazit
         CalendarIcs.sources(a).forEach { s ->
@@ -165,6 +193,12 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
         m.month.getDisplayName(TextStyle.FULL_STANDALONE, cz).replaceFirstChar { it.uppercase() } + " " + m.year
 
     private fun shift(dir: Int) {
+        if (mode == Mode.WEEK) {
+            selected = selected.plusDays(7L * dir)
+            anchor = YearMonth.from(selected)
+            refresh()
+            return
+        }
         anchor = if (mode == Mode.YEAR) anchor.plusYears(dir.toLong()) else anchor.plusMonths(dir.toLong())
         selected = if (mode == Mode.YEAR) selected.plusYears(dir.toLong()) else anchor.atDay(selected.dayOfMonth.coerceAtMost(anchor.lengthOfMonth()))
         refresh()
@@ -204,7 +238,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
         val today = d == LocalDate.now()
         val evs = visibleEvents(d)
         val cell = a.vbox().apply {
-            background = rounded(if (inMonth) C.CARD2 else C.CARD, a.dp(6).toFloat(), a.dp(1), if (today) C.ACCENT else C.LINE)
+            background = rounded(if (!inMonth) C.CARD else if (isFree(d)) FREE_BG else C.CARD2, a.dp(6).toFloat(), a.dp(1), if (today) C.ACCENT else C.LINE)
             setPadding(a.dp(3), a.dp(1), a.dp(3), a.dp(1))
             isFocusable = inMonth
             isClickable = inMonth
@@ -292,6 +326,49 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
         return v
     }
 
+    /** Týden: 7 sloupců s detailem každého dne. */
+    private fun weekView(): View {
+        val r = a.hbox(Gravity.TOP)
+        val ws = weekStart()
+        for (k in 0..6) {
+            val d = ws.plusDays(k.toLong())
+            val today = d == LocalDate.now()
+            val col = a.vbox().apply {
+                background = rounded(if (isFree(d)) FREE_BG else C.CARD2, a.dp(8).toFloat(), a.dp(1), if (today) C.ACCENT else C.LINE)
+                setPadding(a.dp(5), a.dp(3), a.dp(5), a.dp(3))
+                isFocusable = true
+                isClickable = true
+                tag = "d_$d"
+            }
+            val name = d.dayOfWeek.getDisplayName(TextStyle.FULL, cz).replaceFirstChar { it.uppercase() }
+            col.addView(a.text(name, 12f, when { today -> C.ACCENT; isFree(d) -> 0xFFFF8A80.toInt(); else -> C.WHITE }, bold = true))
+            col.addView(a.text("${d.dayOfMonth}. ${d.monthValue}." + if (TvSchedule.isCzHoliday(d)) " · svátek" else "", 10f, C.LABEL))
+            col.addView(a.text(NameDays.forDate(a, d), 9f, C.DIM).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+            forecast[d]?.let { f ->
+                col.addView(a.hbox(Gravity.CENTER_VERTICAL).apply {
+                    addView(a.icon(f.icon, 20), a.lp(a.dp(20), a.dp(20)))
+                    addView(a.text(" ${f.tMax.roundToInt()}° / ${f.tMin.roundToInt()}°", 10f, C.WHITE, condensed = true))
+                    if (f.precip >= 0.1) addView(a.text(" · " + String.format(cz, "%.1f", f.precip) + " mm", 9f, C.RAIN))
+                }, a.lp(top = 2))
+            }
+            col.addView(View(a).apply { setBackgroundColor(C.LINE) }, a.lp(h = 1, top = 3, bottom = 3))
+            val evs = visibleEvents(d)
+            if (evs.isEmpty()) col.addView(a.text("—", 10f, C.DIM))
+            evs.forEach { e ->
+                if (e.time.isEmpty()) col.addView(eventLine(e, small = false))
+                else {
+                    col.addView(a.text(e.time, 9f, srcColor(e.src), bold = true), a.lp(top = 2))
+                    col.addView(a.text(e.summary, 10f, C.WHITE).apply { maxLines = 3 })
+                }
+            }
+            col.setOnFocusChangeListener { _, has -> if (has) selected = d }
+            col.tvFocus(if (today) C.ACCENT else C.LINE, 1.0f)
+            cells[d] = col
+            r.addView(col, a.lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f, end = if (k < 6) 4 else 0))
+        }
+        return r
+    }
+
     private fun yearView(): View {
         val v = a.vbox()
         // nejvytíženější den roku – pro sytost barvy (hustota)
@@ -342,6 +419,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
                     when { d == LocalDate.now() -> C.BG; isFree(d) -> 0xFFFF8A80.toInt(); else -> C.WHITE }, bold = d == LocalDate.now()).apply {
                     gravity = Gravity.CENTER
                     if (inM && d == LocalDate.now()) background = rounded(C.ACCENT, a.dp(3).toFloat())
+                    else if (n == 0 && inM && isFree(d)) background = rounded(0x22FF8A80, a.dp(3).toFloat())
                     else if (n > 0) {
                         // sytost podle počtu událostí
                         val alphaV = (60 + 150 * n / maxCount).coerceAtMost(210)
@@ -454,6 +532,7 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
     }
 
     override fun onKey(keyCode: Int): Boolean {
+        if (loading && keyCode in listOf(KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN)) return true
         val f = root.findFocus() ?: return false
         val tag = f.tag?.toString() ?: return false
         val dx = when (keyCode) {
@@ -474,6 +553,15 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
         neighbor(f, pool, dx, dy)?.let { it.requestFocus(); return true }
         // okraj
         if (dy < 0) return false // nahoru -> tlačítka v liště
+        if (isDay && mode == Mode.WEEK) {
+            if (dx == 0) return true
+            val t = LocalDate.parse(tag.removePrefix("d_")).plusDays(dx.toLong())
+            selected = t
+            anchor = YearMonth.from(t)
+            pendingFocus = "d_$t"
+            refresh()
+            return true
+        }
         val step = if (dx != 0) dx else dy
         if (isMonth) {
             // rok: vlevo / vpravo (i dolů z posledního řádku) -> další / předchozí rok

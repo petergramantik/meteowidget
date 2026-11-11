@@ -18,6 +18,10 @@ class RainStripView(ctx: Context) : View(ctx) {
     var snow = DoubleArray(12)
     /** dílky před tímto indexem jsou už uplynulé (ztlumit) */
     var pastBefore = 0
+    /** východ a západ slunce v hodinách (např. 6.9 = 6:54); NaN = neznámé */
+    var sunrise = Double.NaN
+    var sunset = Double.NaN
+    private val night = Paint().apply { color = 0x332A4A8C; style = Paint.Style.FILL }
 
     private val d = ctx.resources.displayMetrics.density
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x24FFFFFF; strokeWidth = d }
@@ -33,6 +37,12 @@ class RainStripView(ctx: Context) : View(ctx) {
         val w = width.toFloat()
         val h = height - labelH
         val cw = w / 12f
+        // noc jemně tmavomodře (podle východu a západu slunce)
+        if (!sunrise.isNaN() && !sunset.isNaN()) {
+            val pxPerH = w / 24f
+            c.drawRect(0f, 0f, (sunrise * pxPerH).toFloat(), h, night)
+            c.drawRect((sunset * pxPerH).toFloat(), 0f, w, h, night)
+        }
         // dělicí linky
         for (i in 0..12) c.drawLine(i * cw, 0f, i * cw, h, line)
         for (i in 0 until 12) {

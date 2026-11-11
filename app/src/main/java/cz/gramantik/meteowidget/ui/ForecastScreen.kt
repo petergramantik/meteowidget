@@ -333,6 +333,8 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             strip.rain = rain
             strip.snow = snow
             if (d.date == LocalDate.now()) strip.pastBefore = LocalDateTime.now().hour / 2
+            d.sunrise?.let { strip.sunrise = it.hour + it.minute / 60.0 }
+            d.sunset?.let { strip.sunset = it.hour + it.minute / 60.0 }
         }
         box.addView(strip, a.lp(0, a.dp(30), 1f, start = 8, end = 8))
         box.addView(a.text(deg(d.tMax), 16f, C.IN, condensed = true).apply { gravity = Gravity.END }, a.lp(a.dp(38), WRAP))

@@ -197,6 +197,8 @@
         <TextView android:id="@+id/tv_next_start" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" android:textColor="#666666" />
         <TextView style="@style/Label" android:text="Automaticky zavřít panel po spuštění budíkem (minut, 0 = nezavírat). Stisk ovladače zavření zruší." />
         <EditText android:id="@+id/tv_autoclose" style="@style/Field" android:inputType="number" android:maxLength="4" />
+        <TextView style="@style/Label" android:text="Vrátit se na kartu Dnes po nečinnosti" />
+        <Spinner android:id="@+id/tv_idle_return" android:layout_width="match_parent" android:layout_height="wrap_content" />
         <CheckBox android:id="@+id/tv_sleep" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Po automatickém zavření uspat box (vypne i televizi přes HDMI-CEC)" />
         <TextView android:id="@+id/tv_sleep_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" android:textColor="#666666" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" android:textColor="#666666" android:text="V Usnadnění sjeď dolů do části Služby → Meteostanice – uspání → zapnout." />

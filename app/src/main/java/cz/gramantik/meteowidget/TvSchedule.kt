@@ -35,6 +35,10 @@ object TvSchedule {
     fun setWorkdaysOnly(ctx: Context, v: Boolean) { sp(ctx).edit().putBoolean("tvWorkdays", v).apply(); reschedule(ctx) }
     /** automatické zavření panelu spuštěného budíkem (minuty, 0 = nezavírat) */
     fun autoCloseMin(ctx: Context) = sp(ctx).getInt("tvAutoClose", 30)
+    /** návrat na kartu Dnes po nečinnosti (minuty, 0 = nikdy) */
+    fun idleReturnMin(ctx: Context) = sp(ctx).getInt("tvIdleReturn", 5)
+    fun setIdleReturnMin(ctx: Context, v: Int) = sp(ctx).edit().putInt("tvIdleReturn", v).apply()
+
     fun setAutoCloseMin(ctx: Context, v: Int) = sp(ctx).edit().putInt("tvAutoClose", v.coerceIn(0, 24 * 60)).apply()
 
     /** Státní svátek v ČR (včetně Velkého pátku a Velikonočního pondělí). */

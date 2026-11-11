@@ -417,3 +417,33 @@ fun TextView.bounce(): TextView {
     })
     return this
 }
+
+
+/** Obal, který svůj obsah zmenší (rovnoměrně), když se nevejde do přidělené výšky. */
+class FitBox(ctx: Context) : android.widget.FrameLayout(ctx) {
+    init { clipChildren = true }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val w = MeasureSpec.getSize(widthMeasureSpec)
+        val h = MeasureSpec.getSize(heightMeasureSpec)
+        val child = getChildAt(0)
+        if (child != null) {
+            child.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+            val scale = if (h > 0 && child.measuredHeight > h) h.toFloat() / child.measuredHeight else 1f
+            if (scale < 1f) {
+                // změřit širší, aby po zmenšení vyplnil celou šířku
+                child.measure(MeasureSpec.makeMeasureSpec((w / scale).toInt(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+            }
+            child.pivotX = 0f
+            child.pivotY = 0f
+            child.scaleX = scale
+            child.scaleY = scale
+        }
+        val mh = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) (child?.measuredHeight ?: 0) else h
+        setMeasuredDimension(w, mh)
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        getChildAt(0)?.let { it.layout(0, 0, it.measuredWidth, it.measuredHeight) }
+    }
+}

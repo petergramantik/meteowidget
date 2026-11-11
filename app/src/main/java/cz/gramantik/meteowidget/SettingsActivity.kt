@@ -193,6 +193,14 @@ class SettingsActivity : Activity() {
         }
         showNext()
         bindNum(R.id.tv_autoclose, TvSchedule.autoCloseMin(this).toFloat()) { TvSchedule.setAutoCloseMin(this, it.toInt()) }
+        val idleSp = findViewById<Spinner>(R.id.tv_idle_return)
+        val idleOpts = listOf("po 5 minutách" to 5, "po 15 minutách" to 15, "po 30 minutách" to 30, "po 1 hodině" to 60, "nikdy" to 0)
+        idleSp.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, idleOpts.map { it.first })
+        idleSp.setSelection(idleOpts.indexOfFirst { it.second == TvSchedule.idleReturnMin(this) }.coerceAtLeast(0))
+        idleSp.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, pos: Int, id: Long) = TvSchedule.setIdleReturnMin(this@SettingsActivity, idleOpts[pos].second)
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
         val sleepCb = findViewById<CheckBox>(R.id.tv_sleep)
         sleepCb.isChecked = SleepAdmin.enabled(this)
         sleepCb.setOnCheckedChangeListener { _, on ->

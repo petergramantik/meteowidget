@@ -137,7 +137,8 @@ class TvPanel(private val ctx: Context, interactive: Boolean = false) {
     private val tick = object : Runnable {
         override fun run() {
             if (!running) return
-            if (home.activeTab != TvHome.TAB_TODAY && System.currentTimeMillis() - lastInput > 5 * 60_000) {
+            val idle = TvSchedule.idleReturnMin(ctx)
+            if (idle > 0 && home.activeTab != TvHome.TAB_TODAY && System.currentTimeMillis() - lastInput > idle * 60_000L) {
                 home.tomorrow = false
                 focusedTab = TvHome.TAB_TODAY
                 home.activeTab = TvHome.TAB_TODAY

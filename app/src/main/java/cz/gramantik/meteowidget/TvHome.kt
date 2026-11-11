@@ -161,7 +161,8 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
                     }, c.lp(WRAP, WRAP))
                 }, c.lp(0, WRAP, 1f))
             }
-            mid.addView(pr)
+            // blok se zmenší podle zbývajícího místa (srovnání pod ním má pevnou výšku)
+            mid.addView(FitBox(c).apply { addView(pr) }, c.lp(h = 0, weight = 1f))
         }
         // srovnání s dneškem – střídá se s prolínáním
         val td = f?.days?.firstOrNull { it.date == LocalDate.now() }
@@ -183,7 +184,7 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         if (cmp.isNotEmpty()) mid.addView(FadeCycler(c, cmp).apply {
             textSize = 8f; setTextColor(C.ACCENT); gravity = Gravity.CENTER
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, WRAP, top = 3))
+        }, c.lp(LinearLayout.LayoutParams.MATCH_PARENT, c.dp(13), top = 2))
         left.addView(mid, c.lp(h = 0, weight = 1f))
         left.addView(grid, c.lp(h = c.dp(TILES_H), top = 4))
     }

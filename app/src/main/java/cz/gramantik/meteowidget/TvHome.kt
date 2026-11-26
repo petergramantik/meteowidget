@@ -384,12 +384,17 @@ class TvHome(private val ctx: Context, private val interactive: Boolean) {
         val mpz = MorningPrefs(c)
         days.forEachIndexed { i, d ->
             // výrazná změna proti předchozímu dni (oteplení oranžově, ochlazení modře)
+            // porovnávají se zaokrouhlené hodnoty – přesně to, co je vidět na obrazovce
+            fun r(v: Double) = if (v.isNaN()) Double.NaN else v.roundToInt().toDouble()
+            fun diff(a: Double, b: Double) = (r(a) - r(b)).takeIf { !it.isNaN() } ?: 0.0
             val prev = f?.days?.firstOrNull { it.date == d.date.minusDays(1) }
-            val dMax = if (prev != null) d.tMax - prev.tMax else 0.0
-            val dMin = if (prev != null) d.tMin - prev.tMin else 0.0
+            val base = if (mpz.deltaVsToday && d.date.isAfter(today.plusDays(1))) f?.days?.firstOrNull { it.date == today } else null
+            fun pick(a: Double, b: Double) = if (Math.abs(b) > Math.abs(a)) b else a
+            val dMax = pick(if (prev != null) diff(d.tMax, prev.tMax) else 0.0, if (base != null) diff(d.tMax, base.tMax) else 0.0)
+            val dMin = pick(if (prev != null) diff(d.tMin, prev.tMin) else 0.0, if (base != null) diff(d.tMin, base.tMin) else 0.0)
             fun col(delta: Double, normal: Int) = when {
                 delta >= mpz.warmDelta -> 0xFFFF9F43.toInt()
-                delta <= -mpz.coolDelta -> 0xFF4FC3F7.toInt()
+                delta <= -mpz.coolDelta -> 0xFF00E5FF.toInt()
                 else -> normal
             }
             val changed = dMax >= mpz.warmDelta || dMin >= mpz.warmDelta || dMax <= -mpz.coolDelta || dMin <= -mpz.coolDelta

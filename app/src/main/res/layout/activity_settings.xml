@@ -341,6 +341,7 @@
                 <EditText android:id="@+id/tm_cool" style="@style/Field" android:inputType="numberDecimal" android:maxLength="4" />
             </LinearLayout>
         </LinearLayout>
+        <CheckBox android:id="@+id/tm_vs_today" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Porovnávat i s dneškem (pulzuje i postupné oteplení/ochlazení)" />
         </LinearLayout>
         </LinearLayout>
         <LinearLayout android:id="@+id/sec_data" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">

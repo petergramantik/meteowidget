@@ -60,6 +60,10 @@ class MorningPrefs(ctx: Context) {
     var coolDelta: Float
         get() = sp.getFloat("tmCool", 4f)
         set(v) = sp.edit().putFloat("tmCool", v).apply()
+    /** porovnávat i s dneškem (postupná změna) */
+    var deltaVsToday: Boolean
+        get() = sp.getBoolean("tmDeltaToday", false)
+        set(v) = sp.edit().putBoolean("tmDeltaToday", v).apply()
 
     /** Pozdrav podle denní doby. */
     fun greeting(now: LocalTime = LocalTime.now()): Pair<String, String> {

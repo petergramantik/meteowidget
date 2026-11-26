@@ -307,6 +307,7 @@ class SettingsActivity : Activity() {
         bindNum(R.id.tm_rain_pct, mp.rainPct) { mp.rainPct = it }
         bindNum(R.id.tm_warm, mp.warmDelta) { mp.warmDelta = it }
         bindNum(R.id.tm_cool, mp.coolDelta) { mp.coolDelta = it }
+        bindCheck(R.id.tm_vs_today, mp.deltaVsToday) { mp.deltaVsToday = it }
 
         buildMenu()
 
@@ -556,6 +557,12 @@ class SettingsActivity : Activity() {
         }
     }
     private var lastSection: Int? = null
+
+    override fun onPause() {
+        super.onPause()
+        // čísla se uloží i při odchodu tlačítkem Zpět přímo z políčka
+        numFields.forEach { (e, set) -> e.text.toString().replace(',', '.').toFloatOrNull()?.let(set) }
+    }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {

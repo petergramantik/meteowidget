@@ -173,7 +173,8 @@ object NotifyLog {
         return (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
             Item(o.optLong("t"), o.optInt("id"), o.optString("title"), o.optString("text"), o.optBoolean("read"))
-        }.filter { it.t >= min }.sortedByDescending { it.t }
+        }.filter { it.t >= min && !it.title.contains("Žádná výstraha", true) && !it.title.contains("Žádný výstraha", true) }
+            .sortedByDescending { it.t }
     }
 
     @Synchronized

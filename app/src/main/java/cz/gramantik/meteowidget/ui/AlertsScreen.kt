@@ -106,14 +106,13 @@ class AlertsScreen(private val a: Activity) : MainActivity.Screen {
     }
 
     private fun dayLabel(t: Long): String {
-        val c = Calendar.getInstance().apply { timeInMillis = t }
-        val today = Calendar.getInstance()
-        val diff = ((today.apply { set(Calendar.HOUR_OF_DAY, 12) }.timeInMillis -
-            Calendar.getInstance().apply { timeInMillis = t; set(Calendar.HOUR_OF_DAY, 12) }.timeInMillis) / 86_400_000L).toInt()
-        return when (diff) {
-            0 -> "DNES"
-            1 -> "VČERA"
-            else -> SimpleDateFormat("EEEE d. M.", cz).format(c.time).uppercase(cz)
+        // podle skutečného data (ne podle rozdílu milisekund)
+        val d = java.time.Instant.ofEpochMilli(t).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        return when (java.time.temporal.ChronoUnit.DAYS.between(d, java.time.LocalDate.now())) {
+            0L -> "DNES"
+            1L -> "VČERA"
+            else -> d.format(java.time.format.DateTimeFormatter.ofPattern("EEEE d. M.", cz)).uppercase(cz)
         }
     }
+
 }

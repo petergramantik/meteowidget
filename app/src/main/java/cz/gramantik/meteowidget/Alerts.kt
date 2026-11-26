@@ -75,6 +75,9 @@ object Alerts {
     fun manualOrp(ctx: Context): String = sp(ctx).getString("alertOrp", "") ?: ""
     fun setManualOrp(ctx: Context, v: String) = sp(ctx).edit().putString("alertOrp", v.trim()).apply()
 
+    /** „Žádná / Žádný / Žádné výstraha …“ – ČHMÚ tím hlásí, že výstraha neplatí */
+    fun isNoWarning(event: String) = event.trim().startsWith("Žádn", ignoreCase = true)
+
     /** stav posledního stažení pro nastavení */
     fun status(ctx: Context): String = sp(ctx).getString("alertsStatus", "") ?: ""
 
@@ -90,7 +93,7 @@ object Alerts {
         return try {
             val a = JSONArray(s)
             val now = System.currentTimeMillis()
-            (0 until a.length()).map { WarnAlert.fromJson(a.getJSONObject(it)) }.filter { it.expires > now }
+            (0 until a.length()).map { WarnAlert.fromJson(a.getJSONObject(it)) }.filter { it.expires > now && !isNoWarning(it.event) }
         } catch (e: Exception) {
             emptyList()
         }
@@ -168,7 +171,7 @@ object Alerts {
         var inInfo = false
         var lang = ""
         var event = ""; var severity = ""; var onset = ""; var expires = ""
-        var desc = ""; var instr = ""
+        var desc = ""; var instr = ""; var certainty = ""
         val areas = ArrayList<String>()
         val orps = HashSet<String>()
         var inGeocode = false
@@ -183,7 +186,7 @@ object Alerts {
                     text = StringBuilder()
                     if (name == "info") {
                         inInfo = true; lang = ""; event = ""; severity = ""; onset = ""; expires = ""
-                        desc = ""; instr = ""; areas.clear(); orps.clear()
+                        desc = ""; instr = ""; certainty = ""; areas.clear(); orps.clear()
                     }
                     if (name == "geocode") { inGeocode = true; geoName = "" }
                 }
@@ -200,6 +203,7 @@ object Alerts {
                             "language" -> lang = v
                             "event" -> event = v
                             "severity" -> severity = v
+                            "certainty" -> certainty = v
                             "onset" -> onset = v
                             "expires" -> expires = v
                             "description" -> desc = v
@@ -216,7 +220,7 @@ object Alerts {
                                     areas.any { a -> a.split(';', ',').any { it.trim().equals(region, true) } || a.contains(region, true) }
                                 val exp = time(expires)
                                 if (czech && match && msgType != "Cancel" && exp > System.currentTimeMillis() &&
-                                    !event.contains("Žádný", ignoreCase = true)
+                                    !isNoWarning(event) && !certainty.equals("Unlikely", true)
                                 ) {
                                     out.add(
                                         WarnAlert(

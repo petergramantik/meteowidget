@@ -129,16 +129,20 @@ class StationScreen(private val a: Activity) : MainActivity.Screen {
     // ---------- výstrahy ----------
     private fun alerts() {
         for (al in Alerts.load(a)) {
-            val c = a.vbox().apply {
-                background = rounded(0x22000000 or (al.color and 0x00FFFFFF), a.dp(14).toFloat(), a.dp(2), al.color)
-                setPadding(a.dp(14), a.dp(10), a.dp(14), a.dp(12))
+            // jeden řádek – celý text je na stránce Upozornění
+            val fmt = SimpleDateFormat("EEE HH:mm", cz)
+            val c = a.text("⚠ ${al.event} · ${fmt.format(Date(al.onset))} – ${fmt.format(Date(al.expires))}  ›", 14f, al.color, bold = true).apply {
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                background = rounded(0x22000000 or (al.color and 0x00FFFFFF), a.dp(12).toFloat(), a.dp(2), al.color)
+                setPadding(a.dp(12), a.dp(8), a.dp(12), a.dp(8))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    (a as? MainActivity)?.openTab(3) ?: (a as? cz.gramantik.meteowidget.DashboardActivity)?.openAlerts()
+                }
+                tvFocus(al.color, 1.0f)
             }
-            c.addView(a.text("⚠ ${al.event}", 16f, al.color, bold = true))
-            val fmt = SimpleDateFormat("EEE d.M. HH:mm", cz)
-            c.addView(a.text("${al.level} · ${fmt.format(Date(al.onset))} – ${fmt.format(Date(al.expires))}", 12f, C.LABEL), a.lp(top = 4))
-            if (al.description.isNotBlank()) c.addView(a.text(al.description, 13f, C.WHITE), a.lp(top = 6))
-            if (al.instruction.isNotBlank()) c.addView(a.text(al.instruction, 12f, C.DIM), a.lp(top = 4))
-            c.addView(a.text("Zdroj: ČHMÚ", 10f, C.DIM), a.lp(top = 6))
             content.addView(c, a.lp(bottom = 10))
         }
     }

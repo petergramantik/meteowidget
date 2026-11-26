@@ -215,6 +215,13 @@ class DashboardActivity : Activity() {
         cardHost.setPadding(side, 0, side, (resources.displayMetrics.heightPixels * 0.03f).toInt())
     }
 
+    /** Otevře Upozornění (z řádku výstrahy na kartě Doma). */
+    fun openAlerts() {
+        panel.focusedTab = TvHome.TAB_ALERTS
+        panel.home.tabViews.getOrNull(TvHome.TAB_ALERTS)?.requestFocus()
+        showCard(TvHome.TAB_ALERTS)
+    }
+
     private fun focusTabs() {
         panel.home.tabViews.getOrNull(panel.focusedTab)?.requestFocus()
     }

@@ -24,7 +24,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Obrazovka Předpověď: teď, hodinová (48 h), 3 dny po hodinách, 16 dní po dnech, přesnost. */
-class ForecastScreen(private val a: Activity) : MainActivity.Screen {
+class ForecastScreen(private val a: Activity) : MainActivity.Screen, EntryFocus {
     private val cz = Locale("cs", "CZ")
     private val zone = ZoneId.systemDefault()
     private val content = a.vbox().apply { setPadding(a.dp(12), a.dp(4), a.dp(12), a.dp(24)) }
@@ -47,6 +47,9 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
         LocalDate.now().plusDays(1) -> "Zítra"
         else -> d.dayOfWeek.getDisplayName(TextStyle.FULL, cz).replaceFirstChar { it.uppercase() }
     }
+
+    /** TV: ↓ z menu -> zvolené tlačítko 48 hodin / 3 dny / 16 dní */
+    override fun focusEntry(): Boolean = content.findViewWithTag<View>("mode_${mode.name}")?.requestFocus() ?: false
 
     override fun refresh() {
         // zapamatovat prvek s focusem (podle tagu) – po překreslení ho vrátit
@@ -387,7 +390,7 @@ class ForecastScreen(private val a: Activity) : MainActivity.Screen {
             val snow = DoubleArray(12)
             hrs.groupBy { it.time.hour / 2 }.forEach { (slot, list) ->
                 rain[slot] = list.sumOf { it.precip.coerceAtLeast(0.0) }
-                snow[slot] = list.sumOf { it.snow.coerceAtLeast(0.0) } * 0.7 // cm sněhu -> mm vody (přibližně)
+                snow[slot] = list.sumOf { it.snow.coerceAtLeast(0.0) } / 0.7 // cm sněhu -> mm vody (Open-Meteo: cm = mm × 0,7)
             }
             strip.rain = rain
             strip.snow = snow

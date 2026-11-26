@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.FrameLayout
 import cz.gramantik.meteowidget.ui.AlertsScreen
 import cz.gramantik.meteowidget.ui.CalendarScreen
+import cz.gramantik.meteowidget.ui.EntryFocus
 import cz.gramantik.meteowidget.ui.KeyHandler
 import cz.gramantik.meteowidget.ui.ForecastScreen
 import cz.gramantik.meteowidget.ui.RadarScreen
@@ -252,7 +253,7 @@ class DashboardActivity : Activity() {
             else -> {
                 // vstup do obsahu karty
                 showCard(i)
-                cardHandler.postDelayed({ cardHost.requestFocus(View.FOCUS_DOWN) }, 300)
+                cardHandler.postDelayed({ if ((cards[i] as? EntryFocus)?.focusEntry() != true) cardHost.requestFocus(View.FOCUS_DOWN) }, 300)
             }
         }
     }
@@ -331,7 +332,8 @@ class DashboardActivity : Activity() {
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS -> { openSettings(); return true }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 if (cardHost.visibility == View.VISIBLE) {
-                    // do obsahu karty
+                    // do obsahu karty (karta může určit, kam – např. aktuální zobrazení kalendáře)
+                    if ((cards[panel.home.activeTab] as? EntryFocus)?.focusEntry() == true) return true
                     if (!cardHost.requestFocus(View.FOCUS_DOWN)) cardHost.getChildAt(0)?.requestFocus()
                     return true
                 }

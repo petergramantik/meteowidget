@@ -23,6 +23,11 @@ import java.time.temporal.IsoFields
 import java.util.Locale
 import kotlin.math.roundToInt
 
+/** Obrazovka, která určí, kam se má dostat výběr při vstupu šipkou ↓ z menu (TV). */
+interface EntryFocus {
+    fun focusEntry(): Boolean
+}
+
 /** Obrazovka, která chce sama zpracovat některé klávesy (TV). */
 interface KeyHandler {
     fun onKey(keyCode: Int): Boolean
@@ -33,7 +38,7 @@ interface KeyHandler {
  * Svátky a víkendy, jmeniny, počasí u nejbližších dnů, detail dne, vícedenní události,
  * nadcházející události s odpočtem, čísla týdnů, více kalendářů s barvami, hustota v ročním pohledu.
  */
-class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler {
+class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler, EntryFocus {
     private enum class Mode(val label: String) { YEAR("Rok"), M3("3 měsíce"), M1("Měsíc"), WEEK("Týden") }
 
     private val cz = Locale("cs", "CZ")
@@ -506,6 +511,16 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
     }
 
     // ---------- ovladač ----------
+    /** ↓ z menu -> tlačítko aktuálního zobrazení */
+    override fun focusEntry(): Boolean = root.findViewWithTag<View>("mode_${mode.name}")?.requestFocus() ?: false
+
+    /** vybraný den / měsíc v mřížce (jinak dnešek) */
+    private fun focusGrid(): Boolean {
+        val v = if (mode == Mode.YEAR) monthBoxes[YearMonth.from(selected)] ?: monthBoxes[YearMonth.now()] ?: monthBoxes.values.firstOrNull()
+        else cells[selected] ?: cells[LocalDate.now()] ?: cells.entries.minByOrNull { it.key }?.value
+        return v?.requestFocus() ?: false
+    }
+
     /** Sousední prvek v daném směru ze stejné skupiny (dny / měsíce), nebo null na okraji. */
     private fun neighbor(from: View, pool: Collection<View>, dx: Int, dy: Int): View? {
         val f = IntArray(2).also { from.getLocationOnScreen(it) }
@@ -548,11 +563,12 @@ class CalendarScreen(private val a: Activity) : MainActivity.Screen, KeyHandler 
         if (dx == 0 && dy == 0) return false
         val isDay = tag.startsWith("d_")
         val isMonth = tag.startsWith("m_")
-        if (!isDay && !isMonth) return false
+        // z tlačítek nahoře šipkou dolů -> vybraný den / měsíc
+        if (!isDay && !isMonth) return if (dy > 0) focusGrid() else false
         val pool: Collection<View> = if (isDay) cells.values else monthBoxes.values
         neighbor(f, pool, dx, dy)?.let { it.requestFocus(); return true }
         // okraj
-        if (dy < 0) return false // nahoru -> tlačítka v liště
+        if (dy < 0) return focusEntry() // nahoru -> tlačítko aktuálního zobrazení
         if (isDay && mode == Mode.WEEK) {
             if (dx == 0) return true
             val t = LocalDate.parse(tag.removePrefix("d_")).plusDays(dx.toLong())

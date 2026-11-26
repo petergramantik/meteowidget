@@ -33,7 +33,16 @@ class MorningPrefs(ctx: Context) {
         get() = sp.getString("tmNames", "Beátko a Petře")!!
         set(v) = sp.edit().putString("tmNames", v.trim()).apply()
     var frostBelow: Float
-        get() = sp.getFloat("tmFrost", 0f)
+        get() {
+            // jednorázově: původní výchozí 0 °C -> −1 °C
+            if (!sp.getBoolean("tmFrostMig", false)) {
+                val e = sp.edit().putBoolean("tmFrostMig", true)
+                if (sp.getFloat("tmFrost", 0f) == 0f) e.putFloat("tmFrost", -1f)
+                e.apply()
+                return if (sp.getFloat("tmFrost", 0f) == 0f) -1f else sp.getFloat("tmFrost", -1f)
+            }
+            return sp.getFloat("tmFrost", -1f)
+        }
         set(v) = sp.edit().putFloat("tmFrost", v).apply()
     var windFrom: Float
         get() = sp.getFloat("tmWind", 50f)
@@ -98,7 +107,7 @@ object TvMorning {
         val tMin = coldest?.temp ?: d?.tMin
         if (tMin != null && !tMin.isNaN() && tMin < mp.frostBelow) {
             val whenTxt = coldest?.let { if (it.time.hour <= 10) "ráno" else "kolem ${hh(it.time)}" } ?: "ráno"
-            out += MorningWarn("${pre}${whenTxt} mráz až ${deg(tMin)}".replaceFirstChar { it.uppercase() },
+            out += MorningWarn("${pre}${whenTxt} mráz až ${n1(tMin).replace("-", "−")}°".replaceFirstChar { it.uppercase() },
                 "škrabka na auto, teplé oblečení", 0xFF8CC4FF.toInt())
             icons += R.drawable.warn_frost
         }
@@ -113,10 +122,11 @@ object TvMorning {
             icons += R.drawable.warn_snow
         }
         // déšť
-        val rain = if (hours.isNotEmpty()) hours.sumOf { it.precip } else d?.precip ?: 0.0
-        val prob = if (hours.isNotEmpty()) hours.maxOf { it.prob } else d?.prob ?: 0
-        if ((rain >= mp.rainMm || prob >= mp.rainPct) && rain - snow * 0.7 > 0.05) {
-            val wettest = hours.maxByOrNull { it.precip }?.takeIf { it.precip > 0 }
+        fun liquid(precip: Double, snowCm: Double) = (precip - snowCm / 0.7).coerceAtLeast(0.0)
+        val rain = if (hours.isNotEmpty()) hours.sumOf { liquid(it.precip, it.snow) } else d?.let { liquid(it.precip, it.snow) } ?: 0.0
+        val prob = if (hours.isNotEmpty()) hours.filter { liquid(it.precip, it.snow) > 0 }.maxOfOrNull { it.prob } ?: 0 else d?.prob ?: 0
+        if (rain >= mp.rainMm || (prob >= mp.rainPct && rain >= 0.1)) {
+            val wettest = hours.maxByOrNull { liquid(it.precip, it.snow) }?.takeIf { liquid(it.precip, it.snow) > 0 }
             out += MorningWarn("${pre}déšť ${n1(rain)} mm".replaceFirstChar { it.uppercase() },
                 "~ $prob %" + (wettest?.let { " · nejvíc kolem ${hh(it.time)}" } ?: ""), C.RAIN)
             icons += R.drawable.warn_rain
@@ -139,20 +149,22 @@ object TvMorning {
         val ds = day.atStartOfDay(zone).toInstant().toEpochMilli()
         val de = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val alerts = Alerts.load(ctx).filter { it.onset < de && it.expires > ds }
-        alerts.take(3).forEach { a ->
-            val tf = java.text.SimpleDateFormat("EEE HH:mm", cz)
-            out += MorningWarn("ČHMÚ: ${a.event}", "${a.level} · ${tf.format(java.util.Date(a.onset))} – ${tf.format(java.util.Date(a.expires))}", a.color)
-        }
+            .sortedByDescending { when (it.severity) { "Extreme" -> 3; "Severe" -> 2; "Moderate" -> 1; else -> 0 } }
+        // výstrahy ČHMÚ vždy na začátek (podle stupně nebezpečí)
+        val tf = java.text.SimpleDateFormat("EEE HH:mm", cz)
+        out.addAll(0, alerts.take(3).map { a ->
+            MorningWarn("ČHMÚ: ${a.event}", "${a.level} · ${tf.format(java.util.Date(a.onset))} – ${tf.format(java.util.Date(a.expires))}", a.color)
+        })
         val iceAlert = alerts.any { val e = it.event.lowercase(cz); "náledí" in e || "ledovk" in e }
         if (freezing || iceAlert) {
-            if (freezing && !iceAlert) out.add(0, MorningWarn("${pre}hrozí náledí".replaceFirstChar { it.uppercase() },
+            if (freezing && !iceAlert) out.add(alerts.take(3).size, MorningWarn("${pre}hrozí náledí".replaceFirstChar { it.uppercase() },
                 "mrznoucí déšť – opatrně na chodnících i silnici", 0xFFFFD54F.toInt()))
             icons += R.drawable.warn_ice
         }
         // ikonky odpovídající výstraze ČHMÚ pomalu pulzují (a ukážou se, i kdyby je předpověď nehlásila)
         val pulse = HashSet<Int>()
         alerts.forEach { al ->
-            val e = (al.event + " " + al.description).lowercase(cz)
+            val e = al.event.lowercase(cz)
             if ("vítr" in e || "větr" in e || "vichřic" in e) pulse += R.drawable.warn_wind
             if ("náledí" in e || "ledovk" in e) pulse += R.drawable.warn_ice
             if ("sníh" in e || "sněh" in e || "sněž" in e || "závěj" in e) pulse += R.drawable.warn_snow

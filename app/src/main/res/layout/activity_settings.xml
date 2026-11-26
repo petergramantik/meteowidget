@@ -178,6 +178,9 @@
         <TextView style="@style/Section" android:text="Výstrahy ČHMÚ" />
         <TextView style="@style/Label" android:text="Oblast výstrah (název ORP nebo okresu, např. Kyjov)" />
         <EditText android:id="@+id/alert_region" style="@style/Field" android:inputType="text" />
+        <TextView style="@style/Label" android:text="Kód ORP pro výstrahy (Kyjov = 6210; prázdné = podle názvu oblasti)" />
+        <EditText android:id="@+id/alert_orp" style="@style/Field" android:inputType="number" android:maxLength="4" />
+        <TextView android:id="@+id/st_alerts" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="13sp" />
         </LinearLayout>
         <LinearLayout android:id="@+id/sec_notify" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
         <TextView style="@style/Section" android:textSize="22sp" android:text="🔔 Upozornění" />

@@ -142,6 +142,7 @@ class SettingsActivity : Activity() {
         bindCheck(R.id.n_alerts, np.alerts) { np.alerts = it }
         val region = findViewById<EditText>(R.id.alert_region)
         region.setText(Alerts.region(this))
+        findViewById<EditText>(R.id.alert_orp).setText(Alerts.manualOrp(this))
         bindCheck(R.id.n_hum, np.hum) { np.hum = it }
         bindNum(R.id.n_hum_min, np.humMin) { np.humMin = it }
         bindNum(R.id.n_hum_max, np.humMax) { np.humMax = it }
@@ -331,6 +332,7 @@ class SettingsActivity : Activity() {
             scheduleSaver?.invoke()
             morningSaver?.invoke()
             Alerts.setRegion(this, region.text.toString())
+            Alerts.setManualOrp(this, findViewById<EditText>(R.id.alert_orp).text.toString())
             prefs.owmKey = owm.text.toString()
             prefs.mapyKey = mapy.text.toString()
             CalendarIcs.setUrl(this, ics.text.toString())
@@ -711,6 +713,7 @@ class SettingsActivity : Activity() {
     }
 
     private fun showKeyStatus() {
+        findViewById<TextView>(R.id.st_alerts)?.text = Alerts.status(this).ifEmpty { "Výstrahy se stáhnou při příští aktualizaci" }
         val sp = getSharedPreferences("meteo", MODE_PRIVATE)
         listOf(R.id.st_tuya to "stTuya", R.id.st_mapy to "stMapy", R.id.st_owm to "stOwm", R.id.st_google to "stGoogle", R.id.st_ics to "stIcs")
             .forEach { (id, k) ->
@@ -836,6 +839,7 @@ class SettingsActivity : Activity() {
                 "Klepni níže a povol běh bez omezení. Na Samsungu zkontroluj i Péče o baterii → Uspané aplikace."
         if (::updateButton.isInitialized) refreshUpdateUi()
         if (openSection == null && menuStatus.isNotEmpty()) refreshMenu()
+        findViewById<TextView>(R.id.st_alerts)?.text = Alerts.status(this).ifEmpty { "Výstrahy se stáhnou při příští aktualizaci" }
         refreshUpdateBanner()
         showSleepStatus()
     }

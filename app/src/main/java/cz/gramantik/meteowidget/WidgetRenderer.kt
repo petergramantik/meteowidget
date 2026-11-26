@@ -76,6 +76,39 @@ object WidgetRenderer {
         )
     }
 
+    /** Klepnutí na ikonu výstrahy otevře stránku Upozornění. */
+    private fun alertsIntent(ctx: Context): PendingIntent {
+        val i = Intent(ctx, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_TAB, 3)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return PendingIntent.getActivity(ctx, 5, i, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+    }
+
+    /** Pulzující ikony výstrah ČHMÚ (ViewFlipper střídá plnou a ztlumenou ikonu). */
+    private fun applyAlerts(ctx: Context, v: RemoteViews, slots: Int) {
+        val list = Alerts.load(ctx).distinctBy { Alerts.iconFor(it.event) }.sortedByDescending {
+            when (it.severity) { "Extreme" -> 3; "Severe" -> 2; "Moderate" -> 1; else -> 0 }
+        }
+        val flips = listOf(R.id.alert_flip1 to (R.id.alert1a to R.id.alert1b), R.id.alert_flip2 to (R.id.alert2a to R.id.alert2b)).take(slots)
+        flips.forEachIndexed { i, (flip, imgs) ->
+            val al = list.getOrNull(i)
+            if (al == null) {
+                v.setViewVisibility(flip, View.GONE)
+            } else {
+                val icon = Alerts.iconFor(al.event)
+                v.setImageViewResource(imgs.first, icon)
+                v.setImageViewResource(imgs.second, icon)
+                v.setInt(flip, "setBackgroundResource", when (al.severity) {
+                    "Extreme", "Severe" -> R.drawable.alert_ring_red
+                    "Moderate" -> R.drawable.alert_ring_orange
+                    else -> R.drawable.alert_ring_yellow
+                })
+                v.setViewVisibility(flip, View.VISIBLE)
+                v.setOnClickPendingIntent(flip, alertsIntent(ctx))
+            }
+        }
+    }
+
     private fun settingsIntent(ctx: Context): PendingIntent {
         val i = Intent(ctx, SettingsActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -128,6 +161,7 @@ object WidgetRenderer {
         v.setTextViewText(R.id.temp_out, Weather.t(w.tempOut))
         v.setTextViewText(R.id.hum_out, Weather.h(w.humOut))
         v.setTextViewText(R.id.line_in, "${s.p.channelName(Channel.IN)}  ${Weather.t(w.tempIn)} · ${Weather.h(w.humIn)}")
+        applyAlerts(ctx, v, 1)
         return v
     }
 
@@ -150,6 +184,7 @@ object WidgetRenderer {
         v.setOnClickPendingIntent(R.id.settings, settingsIntent(ctx))
         v.setViewVisibility(R.id.update_badge, if (s.updateBadge) View.VISIBLE else View.GONE)
         v.setOnClickPendingIntent(R.id.update_badge, settingsIntent(ctx))
+        if (layout == R.layout.widget_full) applyAlerts(ctx, v, 2)
 
         val p = s.p
         val w = s.w
@@ -294,6 +329,10 @@ object WidgetRenderer {
         val w = s.w
         v.setTextViewText(R.id.mini_temp, Weather.t(w?.temp(ch.tempCode)))
         v.setTextViewText(R.id.mini_hum, Weather.h(w?.hum(ch.humCode)))
+        // nejmenší widget: jen barevná tečka při platné výstraze
+        val al = Alerts.load(ctx).maxByOrNull { when (it.severity) { "Extreme" -> 3; "Severe" -> 2; "Moderate" -> 1; else -> 0 } }
+        v.setViewVisibility(R.id.mini_alert, if (al == null) View.GONE else View.VISIBLE)
+        al?.let { v.setTextColor(R.id.mini_alert, it.color) }
         if (!s.p.isConfigured) v.setOnClickPendingIntent(R.id.root, settingsIntent(ctx))
         return v
     }

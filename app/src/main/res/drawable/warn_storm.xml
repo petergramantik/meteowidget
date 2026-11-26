@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- bouřka: mrak s bleskem -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp" android:height="64dp" android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="#cfd8e3" android:pathData="M18,36a10,10 0 0 1 2,-19.8a14,14 0 0 1 26.6,3.3A8.5,8.5 0 0 1 46,36z" />
+    <path android:fillColor="#ffd54f" android:strokeColor="#e6a700" android:strokeWidth="1.5" android:strokeLineJoin="round"
+        android:pathData="M34,30 L24,46 H32 L28,60 L42,40 H34 L38,30z" />
+</vector>

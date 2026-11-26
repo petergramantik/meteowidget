@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- obecná výstraha: trojúhelník s vykřičníkem -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp" android:height="64dp" android:viewportWidth="64" android:viewportHeight="64">
+    <path android:fillColor="#ffd54f" android:strokeColor="#e53935" android:strokeWidth="4" android:strokeLineJoin="round"
+        android:pathData="M32,5L60,55H4z" />
+    <path android:strokeColor="#1b1b1b" android:strokeWidth="5" android:strokeLineCap="round" android:pathData="M32,22v16" />
+    <path android:fillColor="#1b1b1b" android:pathData="M29,46a3,3 0 1 0 6,0a3,3 0 1 0 -6,0z" />
+</vector>

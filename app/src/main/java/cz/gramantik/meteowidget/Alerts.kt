@@ -75,6 +75,21 @@ object Alerts {
     fun manualOrp(ctx: Context): String = sp(ctx).getString("alertOrp", "") ?: ""
     fun setManualOrp(ctx: Context, v: String) = sp(ctx).edit().putString("alertOrp", v.trim()).apply()
 
+    /** Ikona podle druhu výstrahy (widget). */
+    fun iconFor(event: String): Int {
+        val e = event.lowercase(java.util.Locale("cs", "CZ"))
+        return when {
+            "bouř" in e || "bour" in e -> R.drawable.warn_storm
+            "náledí" in e || "ledovk" in e || "námraz" in e -> R.drawable.warn_ice
+            "sníh" in e || "sněh" in e || "sněž" in e || "závěj" in e -> R.drawable.warn_snow
+            "vítr" in e || "větr" in e || "vichřic" in e -> R.drawable.warn_wind
+            "mráz" in e || "nízk" in e && "teplot" in e -> R.drawable.warn_frost
+            "vysok" in e && "teplot" in e || "horko" in e -> R.drawable.warn_heat
+            "déšť" in e || "dešť" in e || "srážk" in e || "povod" in e -> R.drawable.warn_rain
+            else -> R.drawable.warn_generic
+        }
+    }
+
     /** „Žádná / Žádný / Žádné výstraha …“ – ČHMÚ tím hlásí, že výstraha neplatí */
     fun isNoWarning(event: String) = event.trim().startsWith("Žádn", ignoreCase = true)
 
